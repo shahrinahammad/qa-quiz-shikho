@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shikho Agent Evaluation Hub</title>
+    
+    <!-- Shikho Typography: Poppins & Hind Siliguri -->
+    <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS (CDN for direct GitHub editing) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Shikho Brand Color Config -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        shikho: {
+                            indigo: '#304090',
+                            magenta: '#C02080',
+                            sunrise: '#E0A010',
+                            coral: '#E03050',
+                            canvas: '#F4F5FA',
+                            paper: '#FFFFFF',
+                        }
+                    },
+                    fontFamily: {
+                        en: ['Poppins', 'sans-serif'],
+                        bn: ['Hind Siliguri', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Base settings according to Shikho Design System */
+        body {
+            background-color: #F4F5FA; /* Canvas color */
+            font-family: 'Hind Siliguri', sans-serif;
+            color: #121838; /* Indigo 900 for text */
+        }
+        .ui-en { font-family: 'Poppins', sans-serif; }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <!-- Main Scenario Card (Rounded & Friendly) -->
+    <div class="bg-shikho-paper shadow-lg rounded-2xl p-8 max-w-2xl w-full text-center">
+        
+        <!-- Header Section -->
+        <h3 class="text-shikho-indigo text-2xl font-bold mb-2">দারুণ শুরু! চলো পরের পরিস্থিতিটা দেখি</h3>
+        <p class="text-gray-600 mb-6">Sabiha, একজন প্যারেন্ট রিফান্ড চাইছেন। কী বলবে তাকে?</p>
+        
+        <!-- Question Card -->
+        <div class="bg-shikho-indigo text-shikho-paper rounded-2xl p-6 mb-6 relative overflow-hidden text-left">
+            <span class="text-shikho-sunrise font-bold text-sm mb-2 block">কাস্টমার সিনারিও ০২</span>
+            <p class="text-lg">"আমি গত পরশু কোর্সটি কিনেছি, কিন্তু আমার ছেলের ক্লাস রুটিন মিলছে না। আমি কি রিফান্ড পেতে পারি?"</p>
+        </div>
+
+        <!-- Input Area -->
+        <textarea class="w-full bg-shikho-canvas border-2 border-transparent focus:border-shikho-magenta rounded-xl p-4 mb-4 outline-none resize-none" rows="3" placeholder="এখানে টাইপ করো..."></textarea>
+        
+        <div class="flex flex-col sm:flex-row gap-4 justify-between">
+            <!-- Voice Record Button (Coral) -->
+            <button class="bg-shikho-coral text-white font-bold py-3 px-6 rounded-full flex items-center justify-center gap-2 hover:opacity-90 transition-all">
+                🎤 ভয়েস রেকর্ড
+            </button>
+            
+            <!-- Submit Button (Indigo) -->
+            <button class="bg-shikho-indigo text-white font-bold py-3 px-8 rounded-full flex items-center justify-center gap-2 hover:opacity-90 transition-all">
+                সাবমিট করো ➔
+            </button>
+        </div>
+    </div>
+
+</body>
+</html>
