@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Shikho Agent Hub</title>
+    
+    <!-- Shikho Typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Shikho Brand Color Config -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        shikho: {
+                            indigo: '#304090',
+                            magenta: '#C02080',
+                            sunrise: '#E0A010',
+                            canvas: '#F4F5FA',
+                            paper: '#FFFFFF',
+                        }
+                    },
+                    fontFamily: {
+                        en: ['Poppins', 'sans-serif'],
+                        bn: ['Hind Siliguri', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #F4F5FA; /* Canvas background */
+            font-family: 'Hind Siliguri', sans-serif;
+        }
+        .font-en { font-family: 'Poppins', sans-serif; }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <!-- Login Card (Rounded without sharp corners) -->
+    <div class="bg-shikho-paper shadow-xl rounded-3xl p-8 max-w-sm w-full text-center relative overflow-hidden">
+        
+        <!-- Top Magenta Accent Line for ambition -->
+        <div class="absolute top-0 left-0 w-full h-2 bg-shikho-magenta"></div>
+
+        <!-- Shikho Wordmark placeholder -->
+        <div class="mb-6 mt-2">
+            <h1 class="font-en text-shikho-indigo text-4xl font-bold tracking-tighter lowercase">shikho</h1>
+            <p class="text-shikho-indigo font-bold text-xs tracking-wider mt-1 uppercase">Agent Hub</p>
+        </div>
+
+        <h2 class="text-xl font-bold mb-6 text-gray-800">স্বাগতম! লগিন করে শুরু করো</h2>
+
+        <!-- Form Section -->
+        <form class="text-left" onsubmit="event.preventDefault(); window.location.href='index.html';">
+            
+            <div class="mb-4">
+                <label class="block text-sm font-semibold mb-2 text-gray-700">এজেন্ট আইডি বা ইমেইল</label>
+                <input type="text" required class="w-full bg-shikho-canvas border-2 border-transparent focus:border-shikho-indigo rounded-xl p-3 outline-none transition-colors" placeholder="যেমন: agent-04">
+            </div>
+
+            <div class="mb-8">
+                <label class="block text-sm font-semibold mb-2 text-gray-700">পাসওয়ার্ড</label>
+                <input type="password" required class="w-full bg-shikho-canvas border-2 border-transparent focus:border-shikho-indigo rounded-xl p-3 outline-none transition-colors" placeholder="পাসওয়ার্ড লিখুন">
+            </div>
+
+            <!-- Primary Indigo Button[cite: 1] -->
+            <button type="submit" class="w-full bg-shikho-indigo text-white font-bold py-3 px-6 rounded-full hover:opacity-90 transition-opacity flex justify-center items-center gap-2">
+                লগিন করুন ➔
+            </button>
+            
+        </form>
+        
+        <!-- Helpful Text (Senior Sibling Tone)[cite: 1] -->
+        <div class="mt-6 text-xs text-gray-500">
+            <p>পাসওয়ার্ড ভুলে গেলে সুপার অ্যাডমিনের সাথে যোগাযোগ করো।</p>
+        </div>
+
+    </div>
+
+</body>
+</html>
