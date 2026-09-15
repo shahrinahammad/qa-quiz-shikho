@@ -7,7 +7,6 @@ export default async function ExamPage({ params }: { params: { attempt_id: strin
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // Attempt এবং Evaluation-এর তথ্য নিয়ে আসা
   const { data: attempt } = await supabase
     .from('evaluation_attempts')
     .select(`*, evaluations(*)`)
@@ -16,16 +15,20 @@ export default async function ExamPage({ params }: { params: { attempt_id: strin
 
   if (!attempt) redirect('/agent/dashboard')
 
-  // আপাতত ডেমো পারপাসে ডাটাবেস থেকে ৫টি র‍্যান্ডম প্রশ্ন নিয়ে আসছি
-  const { data: questions } = await supabase
-    .from('questions')
-    .select('*')
-    .limit(5)
+  let questions = []
+  // শুধু ওই ইভালুয়েশনের জন্য সিলেক্ট করা প্রশ্নগুলো আনা
+  if (attempt.evaluations?.question_ids?.length > 0) {
+    const { data } = await supabase
+      .from('questions')
+      .select('*')
+      .in('id', attempt.evaluations.question_ids)
+    questions = data || []
+  }
 
   return (
     <div className="min-h-screen bg-shikho-canvas p-4 sm:p-8">
       <div className="max-w-4xl mx-auto">
-        <ExamClient attempt={attempt} questions={questions || []} />
+        <ExamClient attempt={attempt} questions={questions} />
       </div>
     </div>
   )
