@@ -4,12 +4,15 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 
-export async function submitEvaluation(attempt_id: string, answers: Record<string, string>) {
+export async function submitEvaluation(
+  attempt_id: string, 
+  answers: Record<string, string>,
+  audioUrls: Record<string, string> = {}
+) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error("Unauthorized")
 
-  // অ্যাডমিন ক্লায়েন্ট ব্যবহার করা হলো যাতে সিকিউরিটি (RLS) ডাটা সেভ করতে বাধা না দেয়
   const supabaseAdmin = createAdminClient()
 
   const { data: attempt } = await supabaseAdmin
@@ -20,10 +23,14 @@ export async function submitEvaluation(attempt_id: string, answers: Record<strin
 
   if (!attempt) throw new Error("Attempt not found")
 
-  const answersToInsert = Object.entries(answers).map(([question_id, text_answer]) => ({
+  // টেক্সট এবং অডিও মিলিয়ে কোন কোন প্রশ্নের উত্তর দেওয়া হয়েছে তা বের করা
+  const allQuestionIds = Array.from(new Set([...Object.keys(answers), ...Object.keys(audioUrls)]));
+
+  const answersToInsert = allQuestionIds.map(qId => ({
     attempt_id: attempt.id,
-    question_id: question_id,
-    text_answer: text_answer
+    question_id: qId,
+    text_answer: answers[qId] || '',
+    audio_url: audioUrls[qId] || null
   }))
 
   if (answersToInsert.length > 0) {
