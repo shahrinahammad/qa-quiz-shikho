@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 
 export async function submitEvaluation(attempt_id: string, answers: Record<string, string>) {
@@ -8,8 +9,10 @@ export async function submitEvaluation(attempt_id: string, answers: Record<strin
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error("Unauthorized")
 
-  // ১. Attempt-এর মূল ID বের করা
-  const { data: attempt } = await supabase
+  // অ্যাডমিন ক্লায়েন্ট ব্যবহার করা হলো যাতে সিকিউরিটি (RLS) ডাটা সেভ করতে বাধা না দেয়
+  const supabaseAdmin = createAdminClient()
+
+  const { data: attempt } = await supabaseAdmin
     .from('evaluation_attempts')
     .select('id')
     .eq('attempt_id', attempt_id)
@@ -17,7 +20,6 @@ export async function submitEvaluation(attempt_id: string, answers: Record<strin
 
   if (!attempt) throw new Error("Attempt not found")
 
-  // ২. উত্তরগুলো ডাটাবেসে সেভ করার জন্য প্রস্তুত করা
   const answersToInsert = Object.entries(answers).map(([question_id, text_answer]) => ({
     attempt_id: attempt.id,
     question_id: question_id,
@@ -25,12 +27,11 @@ export async function submitEvaluation(attempt_id: string, answers: Record<strin
   }))
 
   if (answersToInsert.length > 0) {
-    const { error: insertError } = await supabase.from('answers').insert(answersToInsert)
+    const { error: insertError } = await supabaseAdmin.from('answers').insert(answersToInsert)
     if (insertError) throw insertError
   }
 
-  // ৩. পরীক্ষার স্ট্যাটাস আপডেট করা (SUBMITTED -> QA Review)
-  const { error: updateError } = await supabase
+  const { error: updateError } = await supabaseAdmin
     .from('evaluation_attempts')
     .update({
       status: 'UNDER_QA_REVIEW',
