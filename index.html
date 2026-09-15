@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shikho - Login Portal</title>
+    <title>Shikho - AI eLearning Portal</title>
     
     <!-- Shikho Typography: Poppins & Hind Siliguri[cite: 1] -->
     <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -20,14 +20,11 @@
                         shikho: {
                             indigo: '#304090',
                             magenta: '#C02080',
+                            sunrise: '#E0A010',
+                            coral: '#E03050',
                             canvas: '#F4F5FA',
                             paper: '#FFFFFF',
-                            coral: '#E03050'
                         }
-                    },
-                    fontFamily: {
-                        en: ['Poppins', 'sans-serif'],
-                        bn: ['Hind Siliguri', 'sans-serif'],
                     }
                 }
             }
@@ -36,61 +33,162 @@
 
     <style>
         body {
-            background-color: #F4F5FA; /* Canvas background[cite: 1] */
+            background-color: #F4F5FA; /* Canvas Color[cite: 1] */
             font-family: 'Hind Siliguri', sans-serif;
+            color: #0F1322; /* Neutral 900[cite: 1] */
         }
         .font-en { font-family: 'Poppins', sans-serif; }
+        .hidden-view { display: none; }
     </style>
 </head>
-<body class="min-h-screen flex items-center justify-center p-4">
+<body class="min-h-screen flex items-center justify-center p-4 transition-colors duration-300">
 
-    <!-- Login Card (Rounded shapes)[cite: 1] -->
-    <div class="bg-shikho-paper shadow-xl rounded-3xl p-8 max-w-sm w-full text-center relative overflow-hidden">
+    <!-- Main Card (Rounded & Shadowed)[cite: 1] -->
+    <div class="max-w-md w-full bg-shikho-paper rounded-2xl shadow-xl p-8 border-t-4 border-shikho-indigo relative overflow-hidden">
         
-        <!-- Top Magenta Line[cite: 1] -->
-        <div class="absolute top-0 left-0 w-full h-2 bg-shikho-magenta"></div>
-
-        <div class="mb-6 mt-2">
-            <h1 class="font-en text-shikho-indigo text-4xl font-bold tracking-tighter lowercase">shikho</h1>
-            <p class="text-shikho-indigo font-bold text-xs tracking-wider mt-1 uppercase">Evaluation Portal</p>
+        <!-- Header -->
+        <div class="text-center mb-6 mt-2">
+            <h1 class="font-en text-3xl font-bold text-shikho-indigo tracking-tighter lowercase">shikho</h1>
+            <p id="page-subtitle" class="text-xs text-gray-500 font-bold mt-1 uppercase tracking-wider">
+                🔒 Secure Portal Access
+            </p>
         </div>
 
-        <h2 class="text-xl font-bold mb-6 text-gray-800">লগিন করে শুরু করো</h2>
+        <!-- ================= 1. NORMAL LOGIN FORM ================= -->
+        <div id="view-login" class="block animate-fadeIn">
+            <form onsubmit="handleLogin(event)" class="space-y-4 text-left">
+                <div>
+                    <label class="block text-sm font-bold mb-1 text-gray-600">User ID</label>
+                    <input type="text" id="login-id" class="w-full p-3.5 rounded-xl border-2 border-transparent bg-shikho-canvas focus:border-shikho-indigo outline-none font-medium" placeholder="qa, agent অথবা new লিখুন" required>
+                </div>
 
-        <form class="text-left" onsubmit="handleLogin(event)">
-            
-            <div class="mb-4">
-                <label class="block text-sm font-semibold mb-2 text-gray-700">ইউজার আইডি (qa / agent)</label>
-                <input type="text" id="userId" required class="w-full bg-shikho-canvas border-2 border-transparent focus:border-shikho-indigo rounded-xl p-3 outline-none transition-colors" placeholder="qa অথবা agent লেখো">
-            </div>
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="block text-sm font-bold text-gray-600">Password</label>
+                        <button type="button" onclick="switchMode('reset')" class="text-xs text-shikho-magenta hover:underline font-bold transition-colors">
+                            Forgot Password?
+                        </button>
+                    </div>
+                    <input type="password" id="login-pass" class="w-full p-3.5 rounded-xl border-2 border-transparent bg-shikho-canvas focus:border-shikho-indigo outline-none font-medium" placeholder="Enter password..." required>
+                </div>
+                
+                <p id="login-error" class="text-shikho-coral text-xs font-bold hidden">❌ আইডি ভুল! 'qa', 'agent' বা 'new' ব্যবহার করুন।</p>
 
-            <div class="mb-8">
-                <label class="block text-sm font-semibold mb-2 text-gray-700">পাসওয়ার্ড</label>
-                <input type="password" required class="w-full bg-shikho-canvas border-2 border-transparent focus:border-shikho-indigo rounded-xl p-3 outline-none transition-colors" placeholder="পাসওয়ার্ড">
-            </div>
+                <button type="submit" class="w-full bg-shikho-indigo hover:opacity-90 text-white py-3.5 rounded-xl font-bold text-lg shadow-md mt-2 transition-all">
+                    Secure Login ➔
+                </button>
+            </form>
+        </div>
 
-            <p id="errorMsg" class="text-shikho-coral text-sm font-semibold mb-4 hidden">❌ ভুল আইডি! 'qa' অথবা 'agent' লিখে চেষ্টা করো।</p>
+        <!-- ================= 2. FIRST TIME SECURITY SETUP ================= -->
+        <div id="view-setup" class="hidden-view animate-fadeIn">
+            <p class="text-xs text-shikho-indigo bg-blue-50 p-3 rounded-lg border border-blue-100 font-medium mb-4">
+                স্বাগতম! এটি আপনার প্রথম লগইন। পরবর্তীতে পাসওয়ার্ড ভুলে গেলে আইডি রিকভার করার জন্য আপনার সঠিক তথ্যগুলো সেভ করে রাখুন।
+            </p>
+            <form onsubmit="handleSetup(event)" class="space-y-4 text-left">
+                <div>
+                    <label class="block text-xs font-bold mb-1 text-gray-600">📱 Mobile Number</label>
+                    <input type="text" class="w-full p-3 rounded-xl border-2 border-transparent bg-shikho-canvas focus:border-shikho-indigo outline-none text-sm font-medium" placeholder="e.g. 01700000000" required>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold mb-1 text-gray-600">📅 Date of Birth</label>
+                    <input type="date" class="w-full p-3 rounded-xl border-2 border-transparent bg-shikho-canvas focus:border-shikho-indigo outline-none text-sm font-medium" required>
+                </div>
+                <button type="submit" class="w-full bg-shikho-sunrise hover:opacity-90 text-white py-3.5 rounded-xl font-bold text-sm shadow-md mt-2 transition-all">
+                    Save Profile & Continue
+                </button>
+            </form>
+        </div>
 
-            <button type="submit" class="w-full bg-shikho-indigo text-white font-bold py-3 px-6 rounded-full hover:opacity-90 transition-opacity flex justify-center items-center gap-2">
-                লগিন করুন ➔
-            </button>
-        </form>
+        <!-- ================= 3. FORGOT PASSWORD / RESET ================= -->
+        <div id="view-reset" class="hidden-view animate-fadeIn">
+            <p class="text-xs text-[#A27509] bg-[#FBEBC2] p-3 rounded-lg border border-shikho-sunrise font-medium mb-4">
+                পাসওয়ার্ড রিসেট করতে আপনার রেজিস্টার্ড তথ্যগুলো দিন:
+            </p>
+            <form onsubmit="handleReset(event)" class="space-y-3.5 text-left">
+                <div>
+                    <label class="block text-xs font-bold text-gray-600 mb-1">User ID</label>
+                    <input type="text" class="w-full p-2.5 rounded-xl border-2 border-transparent bg-shikho-canvas focus:border-shikho-indigo outline-none text-sm font-medium" placeholder="e.g. agent-01" required>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-600 mb-1">Mobile Number</label>
+                    <input type="text" class="w-full p-2.5 rounded-xl border-2 border-transparent bg-shikho-canvas focus:border-shikho-indigo outline-none text-sm font-medium" placeholder="e.g. 01700000000" required>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-600 mb-1">Date of Birth</label>
+                    <input type="date" class="w-full p-2.5 rounded-xl border-2 border-transparent bg-shikho-canvas focus:border-shikho-indigo outline-none text-sm font-medium" required>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-600 mb-1">New Password</label>
+                    <input type="password" class="w-full p-2.5 rounded-xl border-2 border-transparent bg-shikho-canvas focus:border-shikho-indigo outline-none text-sm font-medium" placeholder="Enter new password" required>
+                </div>
+
+                <div class="flex gap-2 pt-2">
+                    <button type="button" onclick="switchMode('login')" class="w-1/3 py-2.5 rounded-xl font-bold text-sm bg-gray-200 text-gray-600 hover:bg-gray-300 transition-colors">
+                        Back
+                    </button>
+                    <button type="submit" class="w-2/3 bg-shikho-sunrise hover:opacity-90 text-white py-2.5 rounded-xl font-bold text-sm shadow-md transition-all">
+                        Verify & Reset
+                    </button>
+                </div>
+            </form>
+        </div>
+
     </div>
 
+    <!-- JavaScript Logic (No React Needed) -->
     <script>
-        function handleLogin(event) {
-            event.preventDefault(); 
-            const userId = document.getElementById('userId').value.toLowerCase().trim();
-            const errorMsg = document.getElementById('errorMsg');
+        function switchMode(mode) {
+            // Hide all views
+            document.getElementById('view-login').classList.add('hidden-view');
+            document.getElementById('view-setup').classList.add('hidden-view');
+            document.getElementById('view-reset').classList.add('hidden-view');
+            document.getElementById('login-error').classList.add('hidden'); // reset error
 
-            // Routing Logic
-            if (userId === 'qa' || userId === 'admin') {
-                window.location.href = 'admin/index.html'; // Admin folder-e jabe
-            } else if (userId === 'agent') {
-                window.location.href = 'agent/index.html'; // Agent folder-e jabe
+            // Update Subtitle & Show active view
+            const subtitle = document.getElementById('page-subtitle');
+            
+            if (mode === 'login') {
+                document.getElementById('view-login').classList.remove('hidden-view');
+                subtitle.innerText = '🔒 Secure Portal Access';
+            } else if (mode === 'setup') {
+                document.getElementById('view-setup').classList.remove('hidden-view');
+                subtitle.innerText = '🛡️ First Time Setup';
+            } else if (mode === 'reset') {
+                document.getElementById('view-reset').classList.remove('hidden-view');
+                subtitle.innerText = '🔑 Reset Password';
+            }
+        }
+
+        // 1. Handle Login
+        function handleLogin(event) {
+            event.preventDefault();
+            const id = document.getElementById('login-id').value.toLowerCase().trim();
+            const errorMsg = document.getElementById('login-error');
+
+            if (id === 'qa' || id === 'admin') {
+                window.location.href = 'admin/index.html';
+            } else if (id === 'agent') {
+                window.location.href = 'agent/index.html';
+            } else if (id === 'new') {
+                switchMode('setup'); // প্রথমবার লগিনের ক্ষেত্রে সেটআপ পেজে যাবে
             } else {
                 errorMsg.classList.remove('hidden');
             }
+        }
+
+        // 2. Handle First Time Setup
+        function handleSetup(event) {
+            event.preventDefault();
+            alert("✅ আপনার প্রোফাইল সেভ হয়েছে! এজেন্ট ড্যাশবোর্ডে নিয়ে যাওয়া হচ্ছে...");
+            window.location.href = 'agent/index.html';
+        }
+
+        // 3. Handle Password Reset
+        function handleReset(event) {
+            event.preventDefault();
+            alert("✅ পাসওয়ার্ড সফলভাবে পরিবর্তিত হয়েছে! নতুন পাসওয়ার্ড দিয়ে লগইন করুন।");
+            switchMode('login');
         }
     </script>
 </body>
