@@ -1,6 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
 import { createQuestion } from './actions'
-import Link from 'next/link'
 
 export default async function QuestionBankPage({
   searchParams
@@ -10,7 +9,6 @@ export default async function QuestionBankPage({
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  // ডাটাবেস থেকে সব প্রশ্ন নিয়ে আসা
   const { data: questions } = await supabase
     .from('questions')
     .select('*')
@@ -20,20 +18,14 @@ export default async function QuestionBankPage({
     <div className="min-h-screen bg-shikho-canvas p-8">
       <div className="max-w-7xl mx-auto space-y-8">
         
-        {/* Header */}
-        <header className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+        <header className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
           <div>
             <h1 className="text-2xl font-bold text-shikho-indigo-600 font-poppins">Question Bank</h1>
             <p className="text-gray-500 font-poppins text-sm mt-1">Manage and create questions for evaluations.</p>
           </div>
-          <Link href="/super-admin/dashboard" className="text-shikho-indigo-600 font-medium hover:underline font-poppins text-sm">
-            Back to Dashboard
-          </Link>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
-          {/* Add Question Form */}
           <div className="lg:col-span-1 bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-fit">
             <h2 className="text-lg font-semibold text-gray-900 mb-6 font-poppins">Add New Question</h2>
             
@@ -102,7 +94,6 @@ export default async function QuestionBankPage({
             </form>
           </div>
 
-          {/* Questions List */}
           <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
               <h2 className="text-lg font-semibold text-gray-900 font-poppins">Question Library</h2>
@@ -152,7 +143,6 @@ export default async function QuestionBankPage({
               </table>
             </div>
           </div>
-
         </div>
       </div>
     </div>
