@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
+// ১. নতুন ইউজার তৈরি
 export async function createUser(formData: FormData) {
   const email = formData.get('email') as string
   const password = formData.get('password') as string
@@ -19,10 +20,9 @@ export async function createUser(formData: FormData) {
   })
 
   if (error) {
-    return redirect(`/super-admin/users?error=${error.message}`)
+    return redirect(`/super-admin/users?error=${encodeURIComponent(error.message)}`)
   }
 
-  // Upsert ব্যবহার করা হলো যাতে ডাটাবেসে ইউজার শো করতে কোনো সমস্যা না হয়
   if (data.user) {
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
@@ -34,7 +34,7 @@ export async function createUser(formData: FormData) {
       })
 
     if (profileError) {
-      return redirect(`/super-admin/users?error=${profileError.message}`)
+      return redirect(`/super-admin/users?error=${encodeURIComponent(profileError.message)}`)
     }
   }
 
@@ -42,7 +42,7 @@ export async function createUser(formData: FormData) {
   redirect('/super-admin/users?success=User created successfully!')
 }
 
-// নতুন পাসওয়ার্ড রিসেট ফাংশন
+// ২. পাসওয়ার্ড রিসেট
 export async function resetUserPassword(formData: FormData) {
   const userId = formData.get('userId') as string
   const newPassword = formData.get('newPassword') as string
@@ -54,33 +54,47 @@ export async function resetUserPassword(formData: FormData) {
   })
 
   if (error) {
-    return redirect(`/super-admin/users?error=Password reset failed: ${error.message}`)
+    return redirect(`/super-admin/users?error=${encodeURIComponent('Password reset failed: ' + error.message)}`)
   }
 
   revalidatePath('/super-admin/users')
-  redirect(`/super-admin/users?success=Password successfully reset to: ${newPassword}`)
+  redirect(`/super-admin/users?success=${encodeURIComponent('Password reset to: ' + newPassword)}`)
 }
-// রোল পরিবর্তন করার ফাংশন
+
+// ৩. রোল পরিবর্তন
 export async function updateUserRole(formData: FormData) {
   const userId = formData.get('userId') as string
   const role = formData.get('role') as string
   
   const supabaseAdmin = createAdminClient()
-  await supabaseAdmin.from('profiles').update({ role }).eq('id', userId)
+  const { error } = await supabaseAdmin.from('profiles').update({ role }).eq('id', userId)
+  
+  if (error) {
+    return redirect(`/super-admin/users?error=${encodeURIComponent('Failed to update role: ' + error.message)}`)
+  }
   
   revalidatePath('/super-admin/users')
   redirect('/super-admin/users?success=User role updated successfully!')
 }
 
-// আইডি ডিলিট করার ফাংশন
+// ৪. ইউজার ডিলিট
 export async function deleteUser(formData: FormData) {
   const userId = formData.get('userId') as string
   const supabaseAdmin = createAdminClient()
   
   // ১. প্রোফাইল থেকে ডিলিট
-  await supabaseAdmin.from('profiles').delete().eq('id', userId)
+  const { error: profileError } = await supabaseAdmin.from('profiles').delete().eq('id', userId)
+  
+  if (profileError) {
+    return redirect(`/super-admin/users?error=${encodeURIComponent('Cannot delete this user. They might have exam records linked to them.')}`)
+  }
+
   // ২. সিস্টেম (Auth) থেকে ডিলিট
-  await supabaseAdmin.auth.admin.deleteUser(userId)
+  const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(userId)
+  
+  if (authError) {
+    return redirect(`/super-admin/users?error=${encodeURIComponent(authError.message)}`)
+  }
   
   revalidatePath('/super-admin/users')
   redirect('/super-admin/users?success=User deleted successfully!')
