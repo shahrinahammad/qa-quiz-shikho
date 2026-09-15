@@ -15,7 +15,7 @@ export default async function SuperAdminUsersPage({
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'super_admin') redirect('/dashboard')
 
-  // অ্যাডমিন চাবি ব্যবহার করে সব ইউজার আনা হচ্ছে (RLS বাইপাস)
+  // অ্যাডমিন চাবি ব্যবহার করে সব ইউজার আনা হচ্ছে
   const supabaseAdmin = createAdminClient()
   const { data: allUsers } = await supabaseAdmin.from('profiles').select('*').order('created_at', { ascending: false })
 
@@ -96,7 +96,8 @@ export default async function SuperAdminUsersPage({
                         {u.id !== user.id && (
                           <form action={deleteUser}>
                             <input type="hidden" name="userId" value={u.id} />
-                            <button type="submit" className="text-xs text-red-600 bg-red-50 px-3 py-1.5 rounded-lg hover:bg-red-100" onClick={(e) => {if(!confirm('Are you sure you want to delete this user?')) e.preventDefault()}}>Delete</button>
+                            {/* onClick ইভেন্টটি এখান থেকে রিমুভ করা হয়েছে */}
+                            <button type="submit" className="text-xs text-red-600 bg-red-50 px-3 py-1.5 rounded-lg hover:bg-red-100">Delete</button>
                           </form>
                         )}
                       </td>
