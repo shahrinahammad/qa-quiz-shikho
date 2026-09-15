@@ -114,11 +114,7 @@ export default async function QuestionBankPage({
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {questions?.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className="px-6 py-8 text-center text-gray-500 text-sm">
-                        No questions added yet.
-                      </td>
-                    </tr>
+                    <tr><td colSpan={5} className="px-6 py-8 text-center text-gray-500 text-sm">No questions added yet.</td></tr>
                   ) : (
                     questions?.map((q) => (
                       <tr key={q.id} className="hover:bg-gray-50 transition-colors">
@@ -126,15 +122,14 @@ export default async function QuestionBankPage({
                           <div className="text-sm font-medium text-gray-900">{q.question_id}</div>
                           <div className="text-xs text-shikho-magenta-500 mt-1 font-semibold">{q.type}</div>
                         </td>
-                        <td className="px-6 py-4">
-                          <p className="text-sm text-gray-700 font-bengali line-clamp-2">{q.content}</p>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-500">
-                          {q.competency}
-                          <div className="text-xs text-gray-400 mt-1">{q.difficulty}</div>
-                        </td>
-                        <td className="px-6 py-4 text-sm font-bold text-gray-900">
-                          {q.marks}
+                        <td className="px-6 py-4"><p className="text-sm text-gray-700 font-bengali line-clamp-2">{q.content}</p></td>
+                        <td className="px-6 py-4 text-sm text-gray-500">{q.competency}<div className="text-xs text-gray-400 mt-1">{q.difficulty}</div></td>
+                        <td className="px-6 py-4 text-sm font-bold text-gray-900">{q.marks}</td>
+                        <td className="px-6 py-4 text-right">
+                          <form action={deleteQuestion}>
+                            <input type="hidden" name="id" value={q.id} />
+                            <button type="submit" className="text-xs text-red-600 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg" onClick={(e) => {if(!confirm('Delete this question?')) e.preventDefault()}}>Delete</button>
+                          </form>
                         </td>
                       </tr>
                     ))
