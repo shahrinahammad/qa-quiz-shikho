@@ -40,3 +40,14 @@ export async function createQuestion(formData: FormData) {
   revalidatePath('/super-admin/question-bank')
   redirect('/super-admin/question-bank?success=Question added successfully!')
 }
+import { createAdminClient } from '@/lib/supabase/admin'
+
+export async function deleteQuestion(formData: FormData) {
+  const id = formData.get('id') as string
+  const supabaseAdmin = createAdminClient()
+  
+  await supabaseAdmin.from('questions').delete().eq('id', id)
+  
+  revalidatePath('/super-admin/question-bank')
+  redirect('/super-admin/question-bank?success=Question deleted successfully!')
+}
