@@ -7,10 +7,10 @@ export default async function Navbar() {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   
-  // লগিন করা না থাকলে নেভবারটি স্ক্রিনে দেখাবে না (যেমন: Login পেজে)
+  // লগিন করা না থাকলে নেভবারটি স্ক্রিনে দেখাবে না
   if (!user) return null
 
-  // ইউজারের রোল এবং নাম বের করা
+  // ইউজারের রোল বের করা
   const { data: profile } = await supabase
     .from('profiles')
     .select('role, full_name')
@@ -26,7 +26,14 @@ export default async function Navbar() {
         <div className="flex items-center gap-10">
           {/* Logo */}
           <Link href={`/${role === 'super_admin' ? 'super-admin' : role}/dashboard`}>
-            <Image src="/logo.png" alt="Shikho Logo" width={90} height={30} className="object-contain cursor-pointer" />
+            <Image 
+              src="/logo.png" 
+              alt="Shikho Logo" 
+              width={90} 
+              height={30} 
+              className="object-contain cursor-pointer" 
+              priority
+            />
           </Link>
           
           {/* Smart Links (রোল অনুযায়ী লিংক বদলাবে) */}
@@ -36,6 +43,7 @@ export default async function Navbar() {
                 <Link href="/super-admin/dashboard" className="hover:text-shikho-indigo-600 transition-colors">Dashboard</Link>
                 <Link href="/super-admin/users" className="hover:text-shikho-indigo-600 transition-colors">Users</Link>
                 <Link href="/super-admin/question-bank" className="hover:text-shikho-indigo-600 transition-colors">Question Bank</Link>
+                <Link href="/super-admin/evaluations" className="hover:text-shikho-indigo-600 transition-colors">Evaluations</Link>
               </>
             )}
             {role === 'qa' && (
