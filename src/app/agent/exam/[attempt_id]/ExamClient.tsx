@@ -30,9 +30,11 @@ export default function ExamClient({ attempt, questions }: { attempt: any, quest
   const handleNext = () => { if (currentQuestionIdx < questions.length - 1) setCurrentQuestionIdx(idx => idx + 1) }
   const handlePrev = () => { if (currentQuestionIdx > 0) setCurrentQuestionIdx(idx => idx - 1) }
 
-  // বাংলা ভয়েস টাইপিং লজিক
+  // বাংলা ভয়েস টাইপিং লজিক (TypeScript error fixed here)
   const toggleListening = () => {
-    const SpeechRecognition = window.SpeechRecognition || (window as any).webkitSpeechRecognition
+    // window কে (window as any) তে কাস্ট করা হয়েছে যাতে Vercel বিল্ড ফেইল না করে
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    
     if (!SpeechRecognition) {
       alert("Voice typing is not supported in this browser. Please use Google Chrome.")
       return
