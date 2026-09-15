@@ -7,7 +7,6 @@ export default async function AgentDashboard() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // ডাটাবেস থেকে এজেন্টের অ্যাসাইন করা পরীক্ষাগুলো নিয়ে আসা (Evaluations টেবিলের সাথে Join করে)
   const { data: attempts } = await supabase
     .from('evaluation_attempts')
     .select(`
@@ -30,13 +29,11 @@ export default async function AgentDashboard() {
     <div className="min-h-screen bg-shikho-canvas p-4 sm:p-8">
       <div className="max-w-5xl mx-auto space-y-8">
         
-        {/* Header */}
         <header className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
           <h1 className="text-2xl font-bold text-shikho-indigo-600 font-poppins">My Evaluations</h1>
           <p className="text-gray-500 text-sm mt-1 font-poppins">Complete your assigned tests and track your progress.</p>
         </header>
 
-        {/* Assigned Evaluations List */}
         <div>
           <h2 className="text-lg font-semibold text-gray-900 font-poppins mb-4">Pending & Completed</h2>
           
@@ -70,7 +67,6 @@ export default async function AgentDashboard() {
                     </p>
                   </div>
 
-                  {/* Actions based on status */}
                   {attempt.status === 'ASSIGNED' ? (
                     <Link 
                       href={`/agent/exam/${attempt.attempt_id}`}
