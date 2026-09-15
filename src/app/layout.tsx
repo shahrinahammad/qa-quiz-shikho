@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Poppins, Hind_Siliguri } from "next/font/google";
 import "./globals.css";
+import Navbar from "@/components/Navbar";
 
 const poppins = Poppins({
   subsets: ["latin"],
@@ -27,7 +28,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${poppins.variable} ${hindSiliguri.variable} font-poppins bg-shikho-canvas min-h-screen`}>
-        {children}
+        {/* এখানে নেভবার বসানো হলো */}
+        <Navbar />
+        <main className="flex flex-col min-h-screen">
+          {children}
+        </main>
       </body>
     </html>
   );
