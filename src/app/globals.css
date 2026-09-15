@@ -1,0 +1,12 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-shikho-canvas text-gray-900 font-poppins antialiased;
+  }
+}
+
+.text-h1 { @apply text-4xl font-bold leading-tight; }
+.text-body { @apply text-base font-normal leading-relaxed; }
