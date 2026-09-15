@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Shikho - AI eLearning Portal</title>
     
-    <!-- Shikho Typography: Poppins & Hind Siliguri[cite: 1] -->
+    <!-- Shikho Typography: Poppins & Hind Siliguri -->
     <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Shikho Brand Color Config[cite: 1] -->
+    <!-- Shikho Brand Color Config -->
     <script>
         tailwind.config = {
             theme: {
@@ -33,9 +33,9 @@
 
     <style>
         body {
-            background-color: #F4F5FA; /* Canvas Color[cite: 1] */
+            background-color: #F4F5FA; 
             font-family: 'Hind Siliguri', sans-serif;
-            color: #0F1322; /* Neutral 900[cite: 1] */
+            color: #0F1322; 
         }
         .font-en { font-family: 'Poppins', sans-serif; }
         .hidden-view { display: none; }
@@ -43,13 +43,15 @@
 </head>
 <body class="min-h-screen flex items-center justify-center p-4 transition-colors duration-300">
 
-    <!-- Main Card (Rounded & Shadowed)[cite: 1] -->
+    <!-- Main Card -->
     <div class="max-w-md w-full bg-shikho-paper rounded-2xl shadow-xl p-8 border-t-4 border-shikho-indigo relative overflow-hidden">
         
-        <!-- Header -->
-        <div class="text-center mb-6 mt-2">
-            <h1 class="font-en text-3xl font-bold text-shikho-indigo tracking-tighter lowercase">shikho</h1>
-            <p id="page-subtitle" class="text-xs text-gray-500 font-bold mt-1 uppercase tracking-wider">
+        <!-- Header with Original Brand Logo -->
+        <div class="text-center mb-6 mt-2 flex flex-col items-center">
+            <!-- আসল লোগোটি এখানে বসানো হলো -->
+            <img src="logo.png" alt="Shikho Logo" class="h-16 mb-2 object-contain">
+            
+            <p id="page-subtitle" class="text-xs text-gray-500 font-bold uppercase tracking-wider">
                 🔒 Secure Portal Access
             </p>
         </div>
@@ -136,16 +138,14 @@
 
     </div>
 
-    <!-- JavaScript Logic (No React Needed) -->
+    <!-- JavaScript Logic -->
     <script>
         function switchMode(mode) {
-            // Hide all views
             document.getElementById('view-login').classList.add('hidden-view');
             document.getElementById('view-setup').classList.add('hidden-view');
             document.getElementById('view-reset').classList.add('hidden-view');
-            document.getElementById('login-error').classList.add('hidden'); // reset error
+            document.getElementById('login-error').classList.add('hidden'); 
 
-            // Update Subtitle & Show active view
             const subtitle = document.getElementById('page-subtitle');
             
             if (mode === 'login') {
@@ -160,7 +160,6 @@
             }
         }
 
-        // 1. Handle Login
         function handleLogin(event) {
             event.preventDefault();
             const id = document.getElementById('login-id').value.toLowerCase().trim();
@@ -171,20 +170,18 @@
             } else if (id === 'agent') {
                 window.location.href = 'agent/index.html';
             } else if (id === 'new') {
-                switchMode('setup'); // প্রথমবার লগিনের ক্ষেত্রে সেটআপ পেজে যাবে
+                switchMode('setup');
             } else {
                 errorMsg.classList.remove('hidden');
             }
         }
 
-        // 2. Handle First Time Setup
         function handleSetup(event) {
             event.preventDefault();
             alert("✅ আপনার প্রোফাইল সেভ হয়েছে! এজেন্ট ড্যাশবোর্ডে নিয়ে যাওয়া হচ্ছে...");
             window.location.href = 'agent/index.html';
         }
 
-        // 3. Handle Password Reset
         function handleReset(event) {
             event.preventDefault();
             alert("✅ পাসওয়ার্ড সফলভাবে পরিবর্তিত হয়েছে! নতুন পাসওয়ার্ড দিয়ে লগইন করুন।");
