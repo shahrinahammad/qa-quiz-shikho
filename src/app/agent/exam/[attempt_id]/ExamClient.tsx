@@ -30,9 +30,9 @@ export default function ExamClient({ attempt, questions }: { attempt: any, quest
   const handleNext = () => { if (currentQuestionIdx < questions.length - 1) setCurrentQuestionIdx(idx => idx + 1) }
   const handlePrev = () => { if (currentQuestionIdx > 0) setCurrentQuestionIdx(idx => idx - 1) }
 
-  // বাংলা ভয়েস টাইপিং লজিক (TypeScript error fixed here)
+  // বাংলা ভয়েস টাইপিং লজিক (TypeScript error fully fixed here)
   const toggleListening = () => {
-    // window কে (window as any) তে কাস্ট করা হয়েছে যাতে Vercel বিল্ড ফেইল না করে
+    // এখন দুটোর আগেই (window as any) দেওয়া হয়েছে
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
     
     if (!SpeechRecognition) {
@@ -53,7 +53,6 @@ export default function ExamClient({ attempt, questions }: { attempt: any, quest
       for (let i = event.resultIndex; i < event.results.length; i++) {
         currentTranscript += event.results[i][0].transcript
       }
-      // আগের উত্তরের সাথে নতুন ভয়েস টেক্সট যোগ করা
       setAnswers(prev => ({
         ...prev,
         [currentQuestion.id]: (prev[currentQuestion.id] || '') + ' ' + currentTranscript
