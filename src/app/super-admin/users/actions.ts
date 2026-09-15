@@ -1,6 +1,7 @@
 'use server'
 
 import { createAdminClient } from '@/lib/supabase/admin'
+import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
 export async function createUser(formData: FormData) {
@@ -11,7 +12,6 @@ export async function createUser(formData: FormData) {
 
   const supabaseAdmin = createAdminClient()
 
-  // ১. Auth-এ ইউজার তৈরি করা
   const { data, error } = await supabaseAdmin.auth.admin.createUser({
     email,
     password,
@@ -22,17 +22,41 @@ export async function createUser(formData: FormData) {
     return redirect(`/super-admin/users?error=${error.message}`)
   }
 
-  // ২. প্রোফাইল টেবিলে নাম এবং রোল আপডেট করা (কারণ ট্রিগার অটোমেটিক এজেন্ট বানিয়েছিল)
+  // Upsert ব্যবহার করা হলো যাতে ডাটাবেসে ইউজার শো করতে কোনো সমস্যা না হয়
   if (data.user) {
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
-      .update({ full_name: fullName, role: role })
-      .eq('id', data.user.id)
+      .upsert({
+        id: data.user.id,
+        email: email,
+        full_name: fullName,
+        role: role
+      })
 
     if (profileError) {
       return redirect(`/super-admin/users?error=${profileError.message}`)
     }
   }
 
+  revalidatePath('/super-admin/users')
   redirect('/super-admin/users?success=User created successfully!')
+}
+
+// নতুন পাসওয়ার্ড রিসেট ফাংশন
+export async function resetUserPassword(formData: FormData) {
+  const userId = formData.get('userId') as string
+  const newPassword = formData.get('newPassword') as string
+
+  const supabaseAdmin = createAdminClient()
+
+  const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+    password: newPassword
+  })
+
+  if (error) {
+    return redirect(`/super-admin/users?error=Password reset failed: ${error.message}`)
+  }
+
+  revalidatePath('/super-admin/users')
+  redirect(`/super-admin/users?success=Password successfully reset to: ${newPassword}`)
 }
