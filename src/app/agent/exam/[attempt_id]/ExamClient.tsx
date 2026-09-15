@@ -8,16 +8,14 @@ import { createClient } from '@/lib/supabase/client'
 export default function ExamClient({ attempt, questions }: { attempt: any, questions: any[] }) {
   const router = useRouter()
   const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0)
-  
-  // States
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [audioAnswers, setAudioAnswers] = useState<Record<string, Blob>>({})
-  
   const [timeLeft, setTimeLeft] = useState(attempt.evaluations.duration_minutes * 60)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isListening, setIsListening] = useState(false)
-  const [isRecordingAudio, setIsRecordingAudio] = useState(false)
   
+  // অডিও রেকর্ডিংয়ের জন্য নতুন টগল লজিক
+  const [isRecordingAudio, setIsRecordingAudio] = useState(false)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
 
   useEffect(() => {
@@ -37,14 +35,10 @@ export default function ExamClient({ attempt, questions }: { attempt: any, quest
   const handleNext = () => { if (currentQuestionIdx < questions.length - 1) setCurrentQuestionIdx(idx => idx + 1) }
   const handlePrev = () => { if (currentQuestionIdx > 0) setCurrentQuestionIdx(idx => idx - 1) }
 
-  // 1. ফিক্সড বাংলা ভয়েস টাইপিং লজিক
+  // বাংলা ভয়েস টাইপিং
   const toggleListening = () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    if (!SpeechRecognition) {
-      alert("Voice typing is not supported in this browser. Please use Google Chrome.")
-      return
-    }
-
+    if (!SpeechRecognition) { alert("Use Google Chrome for voice typing."); return }
     if (isListening) { setIsListening(false); return; }
 
     const recognition = new SpeechRecognition()
@@ -55,52 +49,42 @@ export default function ExamClient({ attempt, questions }: { attempt: any, quest
     recognition.onstart = () => setIsListening(true)
     recognition.onresult = (event: any) => {
       let finalTranscript = ''
-      // শুধুমাত্র ফাইনাল হওয়া কথাগুলোই আমরা নেব (ডাবল হওয়া রোধ করতে)
       for (let i = event.resultIndex; i < event.results.length; ++i) {
-        if (event.results[i].isFinal) {
-          finalTranscript += event.results[i][0].transcript
-        }
+        if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript
       }
-      
       if (finalTranscript) {
-        setAnswers(prev => ({
-          ...prev,
-          [currentQuestion.id]: (prev[currentQuestion.id] ? prev[currentQuestion.id] + ' ' : '') + finalTranscript.trim()
-        }))
+        setAnswers(prev => ({ ...prev, [currentQuestion.id]: (prev[currentQuestion.id] ? prev[currentQuestion.id] + ' ' : '') + finalTranscript.trim() }))
       }
     }
     recognition.onerror = () => setIsListening(false)
     recognition.onend = () => setIsListening(false)
-
     recognition.start()
   }
 
-  // 2. ডিরেক্ট অডিও রেকর্ডিং লজিক
-  const startAudioRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const mediaRecorder = new MediaRecorder(stream)
-      mediaRecorderRef.current = mediaRecorder
-      const chunks: BlobPart[] = []
-
-      mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data) }
-      mediaRecorder.onstop = () => {
-        const blob = new Blob(chunks, { type: 'audio/webm' })
-        setAudioAnswers(prev => ({ ...prev, [currentQuestion.id]: blob }))
-        stream.getTracks().forEach(track => track.stop())
-      }
-
-      mediaRecorder.start()
-      setIsRecordingAudio(true)
-    } catch (err) {
-      alert("Microphone access denied!")
-    }
-  }
-
-  const stopAudioRecording = () => {
-    if (mediaRecorderRef.current && isRecordingAudio) {
-      mediaRecorderRef.current.stop()
+  // ফিক্সড: অডিও রেকর্ডিং টগল (Click to Start / Stop)
+  const toggleAudioRecording = async () => {
+    if (isRecordingAudio) {
+      if (mediaRecorderRef.current) mediaRecorderRef.current.stop()
       setIsRecordingAudio(false)
+    } else {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        const mediaRecorder = new MediaRecorder(stream)
+        mediaRecorderRef.current = mediaRecorder
+        const chunks: BlobPart[] = []
+
+        mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data) }
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(chunks, { type: 'audio/webm' })
+          setAudioAnswers(prev => ({ ...prev, [currentQuestion.id]: blob }))
+          stream.getTracks().forEach(track => track.stop())
+        }
+
+        mediaRecorder.start()
+        setIsRecordingAudio(true)
+      } catch (err) {
+        alert("Please allow microphone permissions to record audio.")
+      }
     }
   }
 
@@ -110,7 +94,6 @@ export default function ExamClient({ attempt, questions }: { attempt: any, quest
     setAudioAnswers(updatedAudio)
   }
 
-  // 3. সাবমিট লজিক (Audio Upload সহ)
   const handleSubmit = async () => {
     const answeredCount = Array.from(new Set([...Object.keys(answers), ...Object.keys(audioAnswers)])).length
     if (!window.confirm(`You have answered ${answeredCount} out of ${questions.length} questions.\n\nSubmit?`)) return;
@@ -120,30 +103,26 @@ export default function ExamClient({ attempt, questions }: { attempt: any, quest
       const supabase = createClient()
       const audioUrls: Record<string, string> = {}
 
-      // আগে সব রেকর্ড করা অডিও ফোল্ডারে আপলোড করা হচ্ছে
       for (const [qId, blob] of Object.entries(audioAnswers)) {
         const fileName = `${attempt.attempt_id}_${qId}_${Date.now()}.webm`
-        const { data, error } = await supabase.storage.from('audio-answers').upload(fileName, blob)
-        
+        const { data } = await supabase.storage.from('audio-answers').upload(fileName, blob)
         if (data) {
           const { data: publicUrlData } = supabase.storage.from('audio-answers').getPublicUrl(fileName)
           audioUrls[qId] = publicUrlData.publicUrl
         }
       }
-
       await submitEvaluation(attempt.attempt_id, answers, audioUrls)
       router.push('/agent/dashboard')
     } catch (error) {
-      alert("Submission failed. Please try again.")
+      alert("Submission failed.")
       setIsSubmitting(false)
     }
   }
 
-  if (!currentQuestion) return <div className="text-center p-10">Loading questions...</div>
+  if (!currentQuestion) return <div className="text-center p-10">Loading...</div>
 
   return (
     <div className="space-y-6">
-      {/* Header Panel */}
       <div className="bg-white p-6 rounded-2xl shadow-sm flex flex-col sm:flex-row justify-between items-center gap-4 border">
         <div>
           <h1 className="text-xl font-bold font-poppins">{attempt.evaluations.title}</h1>
@@ -151,7 +130,7 @@ export default function ExamClient({ attempt, questions }: { attempt: any, quest
         </div>
         <div className="flex items-center gap-6">
           <div className="w-48 bg-gray-100 h-2.5 rounded-full hidden sm:block">
-            <div className="bg-shikho-magenta-500 h-full transition-all" style={{ width: `${progress}%` }}></div>
+            <div className="bg-shikho-magenta-500 h-full" style={{ width: `${progress}%` }}></div>
           </div>
           <div className={`px-4 py-2 rounded-lg font-bold text-lg ${timeLeft < 300 ? 'bg-red-50 text-red-500' : 'bg-shikho-indigo-50 text-shikho-indigo-600'}`}>
             {formatTime(timeLeft)}
@@ -159,7 +138,6 @@ export default function ExamClient({ attempt, questions }: { attempt: any, quest
         </div>
       </div>
 
-      {/* Question Panel */}
       <div className="bg-white p-8 rounded-2xl shadow-sm border">
         <div className="flex justify-between items-center mb-6 border-b pb-4">
           <span className="text-xs font-bold uppercase text-shikho-sunrise-500 bg-shikho-sunrise-500/10 px-3 py-1 rounded-full">{currentQuestion.type}</span>
@@ -167,29 +145,18 @@ export default function ExamClient({ attempt, questions }: { attempt: any, quest
         </div>
         <h2 className="text-lg text-gray-900 font-bengali leading-relaxed mb-8">{currentQuestion.content}</h2>
 
-        {/* Action Buttons */}
         <div className="flex flex-wrap gap-3 mb-4">
-          <button 
-            onClick={toggleListening}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isListening ? 'bg-red-100 text-red-600 animate-pulse' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-          >
+          <button onClick={toggleListening} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isListening ? 'bg-red-100 text-red-600 animate-pulse' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
             {isListening ? '🔴 Typing...' : '🎤 Bengali Voice Typing'}
           </button>
           
           {!audioAnswers[currentQuestion.id] && (
-            <button 
-              onMouseDown={startAudioRecording}
-              onMouseUp={stopAudioRecording}
-              onTouchStart={startAudioRecording}
-              onTouchEnd={stopAudioRecording}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isRecordingAudio ? 'bg-red-600 text-white animate-pulse' : 'bg-shikho-indigo-50 text-shikho-indigo-600 hover:bg-shikho-indigo-100'}`}
-            >
-              {isRecordingAudio ? 'Recording (Release to stop)' : '🎙️ Hold to Record Audio'}
+            <button onClick={toggleAudioRecording} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isRecordingAudio ? 'bg-red-600 text-white animate-pulse' : 'bg-shikho-indigo-50 text-shikho-indigo-600 hover:bg-shikho-indigo-100'}`}>
+              {isRecordingAudio ? '🛑 Click to Stop Recording' : '🎙️ Click to Record Audio'}
             </button>
           )}
         </div>
 
-        {/* Audio Player (If recorded) */}
         {audioAnswers[currentQuestion.id] && (
           <div className="mb-4 p-4 bg-shikho-indigo-50 rounded-xl flex items-center gap-4">
             <audio src={URL.createObjectURL(audioAnswers[currentQuestion.id])} controls className="h-10 w-full max-w-sm" />
@@ -197,20 +164,13 @@ export default function ExamClient({ attempt, questions }: { attempt: any, quest
           </div>
         )}
 
-        {/* Text Input */}
-        <div>
-          <textarea 
-            rows={5}
-            value={answers[currentQuestion.id] || ''}
-            onChange={(e) => setAnswers({...answers, [currentQuestion.id]: e.target.value})}
-            className="w-full px-4 py-3 rounded-xl border focus:ring-2 focus:ring-shikho-indigo-500 font-bengali text-base"
-            placeholder="Type answer, use voice typing, or record audio directly..."
-            disabled={isSubmitting}
-          ></textarea>
-        </div>
+        <textarea 
+          rows={5} value={answers[currentQuestion.id] || ''} onChange={(e) => setAnswers({...answers, [currentQuestion.id]: e.target.value})}
+          className="w-full px-4 py-3 rounded-xl border focus:ring-2 focus:ring-shikho-indigo-500 font-bengali text-base"
+          placeholder="Type answer, use voice typing, or record audio directly..." disabled={isSubmitting}
+        ></textarea>
       </div>
 
-      {/* Navigation */}
       <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border">
         <button onClick={handlePrev} disabled={currentQuestionIdx === 0 || isSubmitting} className="px-6 py-2.5 rounded-lg text-gray-600 hover:bg-gray-100 disabled:opacity-50">Previous</button>
         {currentQuestionIdx === questions.length - 1 ? (
