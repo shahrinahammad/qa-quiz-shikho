@@ -1,6 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
 import { createEvaluation } from './actions'
-import Link from 'next/link'
 
 export default async function EvaluationsPage({
   searchParams
@@ -9,35 +8,21 @@ export default async function EvaluationsPage({
 }) {
   const supabase = createClient()
   
-  // ডাটাবেস থেকে শুধু Agent-দের লিস্ট আনা
-  const { data: agents } = await supabase
-    .from('profiles')
-    .select('id, email, full_name')
-    .eq('role', 'agent')
-
-  // তৈরি করা সব Evaluations আনা
-  const { data: evaluations } = await supabase
-    .from('evaluations')
-    .select('*')
-    .order('created_at', { ascending: false })
+  const { data: agents } = await supabase.from('profiles').select('id, email, full_name').eq('role', 'agent')
+  const { data: evaluations } = await supabase.from('evaluations').select('*').order('created_at', { ascending: false })
 
   return (
     <div className="min-h-screen bg-shikho-canvas p-8">
       <div className="max-w-7xl mx-auto space-y-8">
         
-        <header className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+        <header className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
           <div>
             <h1 className="text-2xl font-bold text-shikho-indigo-600 font-poppins">Evaluation Builder</h1>
             <p className="text-gray-500 font-poppins text-sm mt-1">Create exams and assign them to agents.</p>
           </div>
-          <Link href="/super-admin/dashboard" className="text-shikho-indigo-600 font-medium hover:underline font-poppins text-sm">
-            Back to Dashboard
-          </Link>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
-          {/* Create Evaluation Form */}
           <div className="lg:col-span-1 bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-fit">
             <h2 className="text-lg font-semibold text-gray-900 mb-6 font-poppins">Assign New Evaluation</h2>
             
@@ -58,12 +43,10 @@ export default async function EvaluationsPage({
                 <label className="block text-sm font-medium text-gray-700 mb-1 font-poppins">Evaluation Title</label>
                 <input type="text" name="title" required className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-shikho-indigo-500 text-sm font-poppins" placeholder="e.g. CRM Final Test Q3" />
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1 font-poppins">Description / Instructions</label>
                 <textarea name="description" rows={2} className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-shikho-indigo-500 text-sm font-poppins" placeholder="Special instructions for the agent..."></textarea>
               </div>
-
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1 font-poppins">Duration (Mins)</label>
@@ -74,7 +57,6 @@ export default async function EvaluationsPage({
                   <input type="number" name="passing_score" required defaultValue="80" min="1" max="100" className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-shikho-indigo-500 text-sm" />
                 </div>
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1 font-poppins">Assign to Agent</label>
                 <select name="agent_id" required className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-shikho-indigo-500 text-sm bg-white font-poppins">
@@ -86,19 +68,16 @@ export default async function EvaluationsPage({
                   ))}
                 </select>
               </div>
-
               <button type="submit" className="w-full bg-shikho-indigo-600 text-white py-2.5 rounded-lg font-poppins font-medium hover:bg-shikho-indigo-700 transition-colors mt-4">
                 Create & Assign
               </button>
             </form>
           </div>
 
-          {/* Evaluations List */}
           <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="p-6 border-b border-gray-100">
               <h2 className="text-lg font-semibold text-gray-900 font-poppins">Active Evaluations</h2>
             </div>
-            
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
@@ -136,7 +115,6 @@ export default async function EvaluationsPage({
               </table>
             </div>
           </div>
-
         </div>
       </div>
     </div>
