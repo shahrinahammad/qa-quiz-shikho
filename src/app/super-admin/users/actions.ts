@@ -60,3 +60,28 @@ export async function resetUserPassword(formData: FormData) {
   revalidatePath('/super-admin/users')
   redirect(`/super-admin/users?success=Password successfully reset to: ${newPassword}`)
 }
+// রোল পরিবর্তন করার ফাংশন
+export async function updateUserRole(formData: FormData) {
+  const userId = formData.get('userId') as string
+  const role = formData.get('role') as string
+  
+  const supabaseAdmin = createAdminClient()
+  await supabaseAdmin.from('profiles').update({ role }).eq('id', userId)
+  
+  revalidatePath('/super-admin/users')
+  redirect('/super-admin/users?success=User role updated successfully!')
+}
+
+// আইডি ডিলিট করার ফাংশন
+export async function deleteUser(formData: FormData) {
+  const userId = formData.get('userId') as string
+  const supabaseAdmin = createAdminClient()
+  
+  // ১. প্রোফাইল থেকে ডিলিট
+  await supabaseAdmin.from('profiles').delete().eq('id', userId)
+  // ২. সিস্টেম (Auth) থেকে ডিলিট
+  await supabaseAdmin.auth.admin.deleteUser(userId)
+  
+  revalidatePath('/super-admin/users')
+  redirect('/super-admin/users?success=User deleted successfully!')
+}
