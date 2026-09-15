@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { createEvaluation } from './actions'
 
 export default async function EvaluationsPage({
@@ -7,9 +8,18 @@ export default async function EvaluationsPage({
   searchParams: { error?: string, success?: string }
 }) {
   const supabase = createClient()
+  const supabaseAdmin = createAdminClient() // অ্যাডমিন ক্লায়েন্ট ব্যবহার করা হলো
   
-  const { data: agents } = await supabase.from('profiles').select('id, email, full_name').eq('role', 'agent')
-  const { data: evaluations } = await supabase.from('evaluations').select('*').order('created_at', { ascending: false })
+  // অ্যাডমিন ক্লায়েন্ট দিয়ে এজেন্টদের লিস্ট আনা (যাতে সিকিউরিটি ব্লক না করে)
+  const { data: agents } = await supabaseAdmin
+    .from('profiles')
+    .select('id, email, full_name')
+    .eq('role', 'agent')
+
+  const { data: evaluations } = await supabase
+    .from('evaluations')
+    .select('*')
+    .order('created_at', { ascending: false })
 
   return (
     <div className="min-h-screen bg-shikho-canvas p-8">
