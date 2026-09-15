@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { createQuestion } from './actions'
+import { createQuestion, deleteQuestion } from './actions' // এখানে deleteQuestion ইম্পোর্ট করা হয়েছে
 
 export default async function QuestionBankPage({
   searchParams
@@ -26,6 +26,8 @@ export default async function QuestionBankPage({
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          
+          {/* Add Question Form */}
           <div className="lg:col-span-1 bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-fit">
             <h2 className="text-lg font-semibold text-gray-900 mb-6 font-poppins">Add New Question</h2>
             
@@ -94,6 +96,7 @@ export default async function QuestionBankPage({
             </form>
           </div>
 
+          {/* Question Library Table */}
           <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
               <h2 className="text-lg font-semibold text-gray-900 font-poppins">Question Library</h2>
@@ -110,11 +113,16 @@ export default async function QuestionBankPage({
                     <th className="px-6 py-4 font-medium">Question</th>
                     <th className="px-6 py-4 font-medium">Competency</th>
                     <th className="px-6 py-4 font-medium">Marks</th>
+                    <th className="px-6 py-4 font-medium text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {questions?.length === 0 ? (
-                    <tr><td colSpan={5} className="px-6 py-8 text-center text-gray-500 text-sm">No questions added yet.</td></tr>
+                    <tr>
+                      <td colSpan={5} className="px-6 py-8 text-center text-gray-500 text-sm">
+                        No questions added yet.
+                      </td>
+                    </tr>
                   ) : (
                     questions?.map((q) => (
                       <tr key={q.id} className="hover:bg-gray-50 transition-colors">
@@ -122,13 +130,23 @@ export default async function QuestionBankPage({
                           <div className="text-sm font-medium text-gray-900">{q.question_id}</div>
                           <div className="text-xs text-shikho-magenta-500 mt-1 font-semibold">{q.type}</div>
                         </td>
-                        <td className="px-6 py-4"><p className="text-sm text-gray-700 font-bengali line-clamp-2">{q.content}</p></td>
-                        <td className="px-6 py-4 text-sm text-gray-500">{q.competency}<div className="text-xs text-gray-400 mt-1">{q.difficulty}</div></td>
-                        <td className="px-6 py-4 text-sm font-bold text-gray-900">{q.marks}</td>
+                        <td className="px-6 py-4">
+                          <p className="text-sm text-gray-700 font-bengali line-clamp-2">{q.content}</p>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-500">
+                          {q.competency}
+                          <div className="text-xs text-gray-400 mt-1">{q.difficulty}</div>
+                        </td>
+                        <td className="px-6 py-4 text-sm font-bold text-gray-900">
+                          {q.marks}
+                        </td>
                         <td className="px-6 py-4 text-right">
                           <form action={deleteQuestion}>
                             <input type="hidden" name="id" value={q.id} />
-                            <button type="submit" className="text-xs text-red-600 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg" onClick={(e) => {if(!confirm('Delete this question?')) e.preventDefault()}}>Delete</button>
+                            {/* onClick ইভেন্ট মুছে দেওয়া হয়েছে */}
+                            <button type="submit" className="text-xs text-red-600 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors">
+                              Delete
+                            </button>
                           </form>
                         </td>
                       </tr>
