@@ -2,16 +2,21 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { submitEvaluation } from './actions'
 
 export default function ExamClient({ attempt, questions }: { attempt: any, questions: any[] }) {
   const router = useRouter()
   const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0)
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [timeLeft, setTimeLeft] = useState(attempt.evaluations.duration_minutes * 60)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Timer Logic
   useEffect(() => {
-    if (timeLeft <= 0) return // Auto submit logic can be added here
+    if (timeLeft <= 0) {
+      handleSubmit() // Time up হলে অটো সাবমিট
+      return
+    }
     const timerId = setInterval(() => setTimeLeft(t => t - 1), 1000)
     return () => clearInterval(timerId)
   }, [timeLeft])
@@ -33,10 +38,20 @@ export default function ExamClient({ attempt, questions }: { attempt: any, quest
     if (currentQuestionIdx > 0) setCurrentQuestionIdx(idx => idx - 1)
   }
 
-  const handleSubmit = () => {
-    // পরবর্তী ধাপে আমরা ডাটাবেসে উত্তরগুলো সেভ করার লজিক লিখব
-    alert('Evaluation Submitted Successfully! (Under QA Review)')
-    router.push('/agent/dashboard')
+  const handleSubmit = async () => {
+    const answeredCount = Object.keys(answers).filter(k => answers[k].trim() !== '').length;
+    const confirmSubmit = window.confirm(`You have answered ${answeredCount} out of ${questions.length} questions.\n\nAre you sure you want to submit?`);
+    
+    if (!confirmSubmit) return;
+
+    setIsSubmitting(true)
+    try {
+      await submitEvaluation(attempt.attempt_id, answers)
+      router.push('/agent/dashboard')
+    } catch (error) {
+      alert("Something went wrong while submitting.")
+      setIsSubmitting(false)
+    }
   }
 
   if (!currentQuestion) return <div className="text-center p-10">Loading questions...</div>
@@ -52,10 +67,10 @@ export default function ExamClient({ attempt, questions }: { attempt: any, quest
         </div>
         
         <div className="flex items-center gap-6">
-          <div className="w-48 bg-gray-100 h-2.5 rounded-full overflow-hidden">
+          <div className="w-48 bg-gray-100 h-2.5 rounded-full overflow-hidden hidden sm:block">
             <div className="bg-shikho-magenta-500 h-full transition-all" style={{ width: `${progress}%` }}></div>
           </div>
-          <div className="bg-shikho-indigo-50 text-shikho-indigo-600 px-4 py-2 rounded-lg font-bold font-poppins text-lg tabular-nums shadow-inner">
+          <div className={`px-4 py-2 rounded-lg font-bold font-poppins text-lg tabular-nums shadow-inner ${timeLeft < 300 ? 'bg-red-50 text-shikho-coral-500' : 'bg-shikho-indigo-50 text-shikho-indigo-600'}`}>
             {formatTime(timeLeft)}
           </div>
         </div>
@@ -74,15 +89,16 @@ export default function ExamClient({ attempt, questions }: { attempt: any, quest
           {currentQuestion.content}
         </h2>
 
-        {/* Answer Input Area (Text for now) */}
+        {/* Answer Input Area */}
         <div className="mt-4">
           <label className="block text-sm font-medium text-gray-700 mb-2 font-poppins">Your Answer</label>
           <textarea 
-            rows={5}
+            rows={6}
             value={answers[currentQuestion.id] || ''}
             onChange={(e) => setAnswers({...answers, [currentQuestion.id]: e.target.value})}
             className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-shikho-indigo-500 font-bengali text-base shadow-sm"
             placeholder="Type your answer here..."
+            disabled={isSubmitting}
           ></textarea>
         </div>
       </div>
@@ -91,7 +107,7 @@ export default function ExamClient({ attempt, questions }: { attempt: any, quest
       <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
         <button 
           onClick={handlePrev} 
-          disabled={currentQuestionIdx === 0}
+          disabled={currentQuestionIdx === 0 || isSubmitting}
           className="px-6 py-2.5 rounded-lg font-poppins font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-50 transition-colors"
         >
           Previous
@@ -100,14 +116,16 @@ export default function ExamClient({ attempt, questions }: { attempt: any, quest
         {currentQuestionIdx === questions.length - 1 ? (
           <button 
             onClick={handleSubmit}
-            className="px-8 py-2.5 bg-shikho-coral-500 text-white rounded-lg font-poppins font-medium hover:bg-red-600 transition-colors shadow-ambient"
+            disabled={isSubmitting}
+            className="px-8 py-2.5 bg-shikho-coral-500 text-white rounded-lg font-poppins font-medium hover:bg-red-600 transition-colors shadow-ambient disabled:opacity-50"
           >
-            Submit Exam
+            {isSubmitting ? 'Submitting...' : 'Submit Exam'}
           </button>
         ) : (
           <button 
             onClick={handleNext}
-            className="px-8 py-2.5 bg-shikho-indigo-600 text-white rounded-lg font-poppins font-medium hover:bg-shikho-indigo-700 transition-colors shadow-ambient"
+            disabled={isSubmitting}
+            className="px-8 py-2.5 bg-shikho-indigo-600 text-white rounded-lg font-poppins font-medium hover:bg-shikho-indigo-700 transition-colors shadow-ambient disabled:opacity-50"
           >
             Next Question
           </button>
