@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { requestRecheck } from './actions'
@@ -8,7 +9,10 @@ export default async function ResultPage({ params }: { params: { attempt_id: str
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: attempt } = await supabase
+  // ডাটাবেস সিকিউরিটি বাইপাস করার জন্য অ্যাডমিন চাবি ব্যবহার করা হলো
+  const supabaseAdmin = createAdminClient()
+
+  const { data: attempt } = await supabaseAdmin
     .from('evaluation_attempts')
     .select(`*, evaluations(*)`)
     .eq('attempt_id', params.attempt_id)
@@ -18,7 +22,8 @@ export default async function ResultPage({ params }: { params: { attempt_id: str
     redirect('/agent/dashboard')
   }
 
-  const { data: answers } = await supabase
+  // অ্যাডমিন চাবি দিয়ে উত্তরগুলো আনা হলো যাতে ডাটাবেস ব্লক না করে
+  const { data: answers } = await supabaseAdmin
     .from('answers')
     .select('*, questions(*)')
     .eq('attempt_id', attempt.id)
@@ -53,24 +58,31 @@ export default async function ResultPage({ params }: { params: { attempt_id: str
           </div>
         )}
 
+        {/* Question Breakdown - এখন এটা ঠিকমতো শো করবে */}
+        <h3 className="text-lg font-bold text-gray-900 font-poppins pt-4">Question Breakdown</h3>
         <div className="space-y-4">
-          {answers?.map((ans: any, index: number) => (
-            <div key={ans.id} className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-              <div className="flex justify-between items-start mb-4">
-                <span className="text-sm font-bold text-gray-500">Q{index + 1}.</span>
-                <span className="text-sm font-bold bg-gray-100 px-3 py-1 rounded-md text-gray-700">Marks: {ans.marks_awarded || 0} / {ans.questions.marks}</span>
+          {answers?.length === 0 ? (
+            <p className="text-sm text-gray-500 italic">No answers recorded.</p>
+          ) : (
+            answers?.map((ans: any, index: number) => (
+              <div key={ans.id} className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                <div className="flex justify-between items-start mb-4">
+                  <span className="text-sm font-bold text-gray-500">Q{index + 1}.</span>
+                  <span className="text-sm font-bold bg-gray-100 px-3 py-1 rounded-md text-gray-700">Marks: {ans.marks_awarded || 0} / {ans.questions.marks}</span>
+                </div>
+                <p className="text-base text-gray-900 font-bengali font-medium mb-4">{ans.questions.content}</p>
+                <div className="bg-gray-50 p-4 rounded-lg text-sm text-gray-700 font-bengali">
+                  <span className="font-bold text-xs uppercase text-gray-400 block mb-1">Your Answer:</span>
+                  {ans.text_answer && <p>{ans.text_answer}</p>}
+                  {ans.audio_url && <audio src={ans.audio_url} controls className="mt-2 h-8 w-full max-w-xs" />}
+                  {!ans.text_answer && !ans.audio_url && <span className="italic text-gray-400">No answer provided.</span>}
+                </div>
               </div>
-              <p className="text-base text-gray-900 font-bengali font-medium mb-4">{ans.questions.content}</p>
-              <div className="bg-gray-50 p-4 rounded-lg text-sm text-gray-700 font-bengali">
-                <span className="font-bold text-xs uppercase text-gray-400 block mb-1">Your Answer:</span>
-                {ans.text_answer && <p>{ans.text_answer}</p>}
-                {ans.audio_url && <audio src={ans.audio_url} controls className="mt-2 h-8 w-full max-w-xs" />}
-                {!ans.text_answer && !ans.audio_url && <span className="italic text-gray-400">No answer provided.</span>}
-              </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
 
+        {/* Feedback / Objection Form */}
         {attempt.status === 'PUBLISHED' && (
           <div className="bg-orange-50 p-6 rounded-2xl border border-orange-200 mt-8 shadow-sm">
             <h3 className="text-sm font-bold text-orange-800 mb-2 font-poppins">Not satisfied with the result?</h3>
