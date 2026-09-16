@@ -8,12 +8,21 @@ export default async function ResultPage({ params }: { params: { attempt_id: str
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: attempt } = await supabase.from('evaluation_attempts').select(`*, evaluations(*)`).eq('attempt_id', params.attempt_id).single()
+  const { data: attempt } = await supabase
+    .from('evaluation_attempts')
+    .select(`*, evaluations(*)`)
+    .eq('attempt_id', params.attempt_id)
+    .single()
 
-  // Published এবং Recheck Requested দুই অবস্থাতেই রেজাল্ট পেজ দেখা যাবে
-  if (!attempt || !['PUBLISHED', 'RECHECK_REQUESTED'].includes(attempt.status)) redirect('/agent/dashboard')
+  if (!attempt || !['PUBLISHED', 'RECHECK_REQUESTED'].includes(attempt.status)) {
+    redirect('/agent/dashboard')
+  }
 
-  const { data: answers } = await supabase.from('answers').select('*, questions(*)').eq('attempt_id', attempt.id)
+  const { data: answers } = await supabase
+    .from('answers')
+    .select('*, questions(*)')
+    .eq('attempt_id', attempt.id)
+    
   const isPassed = attempt.overall_score >= attempt.evaluations.passing_score
 
   return (
@@ -29,7 +38,7 @@ export default async function ResultPage({ params }: { params: { attempt_id: str
         <div className="bg-white p-6 rounded-2xl shadow-sm border flex flex-col md:flex-row justify-between items-center gap-4">
           <div>
             <h1 className="text-2xl font-bold font-poppins text-gray-900">{attempt.evaluations.title}</h1>
-            <p className="text-sm text-gray-500 mt-1">Evaluated on: {new Date(attempt.finalized_at).toLocaleDateString()}</p>
+            <p className="text-sm text-gray-500 mt-1">Evaluated on: {new Date(attempt.finalized_at || attempt.created_at).toLocaleDateString()}</p>
           </div>
           <div className={`px-6 py-3 rounded-xl border-2 text-center ${isPassed ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
             <p className={`text-xs font-bold uppercase ${isPassed ? 'text-green-600' : 'text-red-600'}`}>{isPassed ? 'Passed' : 'Needs Improvement'}</p>
@@ -62,19 +71,28 @@ export default async function ResultPage({ params }: { params: { attempt_id: str
           ))}
         </div>
 
-        <div className="flex justify-between items-center mt-4">
-          <Link href="/agent/dashboard" className="text-shikho-indigo-600 font-medium hover:underline">
-            &larr; Back to Dashboard
-          </Link>
-          {attempt.status === 'PUBLISHED' && (
-            <form action={requestRecheck}>
+        {attempt.status === 'PUBLISHED' && (
+          <div className="bg-orange-50 p-6 rounded-2xl border border-orange-200 mt-8 shadow-sm">
+            <h3 className="text-sm font-bold text-orange-800 mb-2 font-poppins">Not satisfied with the result?</h3>
+            <form action={requestRecheck} className="space-y-3">
               <input type="hidden" name="attempt_id" value={attempt.attempt_id} />
-              <button type="submit" onClick={(e) => {if(!confirm('Are you sure you want to request a recheck?')) e.preventDefault()}} className="bg-orange-100 text-orange-700 px-6 py-2 rounded-lg font-bold hover:bg-orange-200 transition-colors shadow-sm">
-                Request Recheck
-              </button>
+              <textarea name="agent_feedback" required rows={2} className="w-full px-4 py-2 rounded-lg border border-orange-300 focus:ring-2 focus:ring-orange-500 text-sm font-poppins" placeholder="Write your feedback or reason for objection here..."></textarea>
+              <div className="flex justify-between items-center mt-4">
+                <Link href="/agent/dashboard" className="text-shikho-indigo-600 font-medium hover:underline text-sm">&larr; Back to Dashboard</Link>
+                <button type="submit" className="bg-orange-500 text-white px-6 py-2.5 rounded-lg font-bold hover:bg-orange-600 transition-colors shadow-sm text-sm">
+                  Submit Feedback & Request Recheck
+                </button>
+              </div>
             </form>
-          )}
-        </div>
+          </div>
+        )}
+        
+        {attempt.status !== 'PUBLISHED' && (
+          <div className="mt-4">
+            <Link href="/agent/dashboard" className="text-shikho-indigo-600 font-medium hover:underline text-sm">&larr; Back to Dashboard</Link>
+          </div>
+        )}
+        
       </div>
     </div>
   )
