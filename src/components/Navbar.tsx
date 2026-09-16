@@ -40,6 +40,8 @@ export default async function Navbar() {
             {role === 'qa' && (
               <>
                 <Link href="/qa/dashboard" className="hover:text-shikho-indigo-600">Dashboard</Link>
+                {/* QA-এর জন্য নতুন লিংক */}
+                <Link href="/qa/users" className="hover:text-shikho-indigo-600">Agent Management</Link>
                 <Link href="/super-admin/question-bank" className="hover:text-shikho-indigo-600">Question Bank</Link>
                 <Link href="/super-admin/evaluations" className="hover:text-shikho-indigo-600">Evaluations</Link>
               </>
