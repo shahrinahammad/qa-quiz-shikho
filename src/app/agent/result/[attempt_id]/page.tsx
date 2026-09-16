@@ -9,12 +9,12 @@ export default async function ResultPage({ params }: { params: { attempt_id: str
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // ডাটাবেস সিকিউরিটি বাইপাস করার জন্য অ্যাডমিন চাবি ব্যবহার করা হলো
   const supabaseAdmin = createAdminClient()
 
+  // 🔍 এখানে qa:profiles যুক্ত করা হয়েছে যাতে QA-এর নাম পাওয়া যায়
   const { data: attempt } = await supabaseAdmin
     .from('evaluation_attempts')
-    .select(`*, evaluations(*)`)
+    .select(`*, evaluations(*), qa:profiles!evaluation_attempts_qa_id_fkey(full_name)`)
     .eq('attempt_id', params.attempt_id)
     .single()
 
@@ -22,7 +22,6 @@ export default async function ResultPage({ params }: { params: { attempt_id: str
     redirect('/agent/dashboard')
   }
 
-  // অ্যাডমিন চাবি দিয়ে উত্তরগুলো আনা হলো যাতে ডাটাবেস ব্লক না করে
   const { data: answers } = await supabaseAdmin
     .from('answers')
     .select('*, questions(*)')
@@ -43,7 +42,12 @@ export default async function ResultPage({ params }: { params: { attempt_id: str
         <div className="bg-white p-6 rounded-2xl shadow-sm border flex flex-col md:flex-row justify-between items-center gap-4">
           <div>
             <h1 className="text-2xl font-bold font-poppins text-gray-900">{attempt.evaluations.title}</h1>
-            <p className="text-sm text-gray-500 mt-1">Evaluated on: {new Date(attempt.finalized_at || attempt.created_at).toLocaleDateString()}</p>
+            <p className="text-sm text-gray-500 mt-1 flex items-center gap-2">
+              <span>Evaluated on: {new Date(attempt.finalized_at || attempt.created_at).toLocaleDateString()}</span>
+              <span className="text-gray-300">|</span>
+              {/* QA-এর নাম এখানে শো করবে */}
+              <span>Reviewed By: <span className="font-bold text-shikho-magenta-600">{attempt.qa?.full_name || 'QA Team'}</span></span>
+            </p>
           </div>
           <div className={`px-6 py-3 rounded-xl border-2 text-center ${isPassed ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
             <p className={`text-xs font-bold uppercase ${isPassed ? 'text-green-600' : 'text-red-600'}`}>{isPassed ? 'Passed' : 'Needs Improvement'}</p>
@@ -58,7 +62,6 @@ export default async function ResultPage({ params }: { params: { attempt_id: str
           </div>
         )}
 
-        {/* Question Breakdown - এখন এটা ঠিকমতো শো করবে */}
         <h3 className="text-lg font-bold text-gray-900 font-poppins pt-4">Question Breakdown</h3>
         <div className="space-y-4">
           {answers?.length === 0 ? (
@@ -82,7 +85,6 @@ export default async function ResultPage({ params }: { params: { attempt_id: str
           )}
         </div>
 
-        {/* Feedback / Objection Form */}
         {attempt.status === 'PUBLISHED' && (
           <div className="bg-orange-50 p-6 rounded-2xl border border-orange-200 mt-8 shadow-sm">
             <h3 className="text-sm font-bold text-orange-800 mb-2 font-poppins">Not satisfied with the result?</h3>
@@ -104,7 +106,6 @@ export default async function ResultPage({ params }: { params: { attempt_id: str
             <Link href="/agent/dashboard" className="text-shikho-indigo-600 font-medium hover:underline text-sm">&larr; Back to Dashboard</Link>
           </div>
         )}
-        
       </div>
     </div>
   )
