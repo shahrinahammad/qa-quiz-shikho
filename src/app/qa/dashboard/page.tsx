@@ -8,6 +8,10 @@ export default async function QADashboard() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  // 🔒 Security Lock: QA বা Super Admin ছাড়া কেউ ঢুকতে পারবে না (URL হ্যাকিং প্রটেকশন)
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  if (profile?.role !== 'qa' && profile?.role !== 'super_admin') redirect('/login')
+
   const supabaseAdmin = createAdminClient()
   
   const { data: allTasks } = await supabaseAdmin
@@ -37,8 +41,17 @@ export default async function QADashboard() {
               {recheckRequests.map((attempt: any) => (
                 <div key={attempt.id} className="bg-orange-50 p-6 rounded-2xl border-2 border-orange-200">
                   <h3 className="text-lg font-bold text-gray-900 mb-1">{attempt.evaluations.title}</h3>
-                  <p className="text-sm text-gray-600 mb-4"><span className="font-medium">Agent:</span> {attempt.profiles?.full_name}</p>
-                  <Link href={`/qa/review/${attempt.attempt_id}`} className="block text-center bg-orange-500 text-white py-2 rounded-lg font-bold hover:bg-orange-600">Review Dispute</Link>
+                  <p className="text-sm text-gray-600 mb-4"><span className="font-medium">Agent:</span> {attempt.profiles?.full_name || attempt.profiles?.email}</p>
+                  
+                  {/* এজেন্টের লেখা ফিডব্যাক এখানে শো করবে */}
+                  {attempt.agent_feedback && (
+                    <div className="bg-white p-3 rounded-lg border border-orange-100 mb-4 text-sm text-gray-700">
+                      <span className="font-bold text-orange-700 block mb-1">Agent's Note:</span>
+                      {attempt.agent_feedback}
+                    </div>
+                  )}
+                  
+                  <Link href={`/qa/review/${attempt.attempt_id}`} className="block text-center bg-orange-500 text-white py-2.5 rounded-lg font-bold hover:bg-orange-600 transition-colors shadow-sm">Review Dispute</Link>
                 </div>
               ))}
             </div>
@@ -49,14 +62,14 @@ export default async function QADashboard() {
         <div>
           <h2 className="text-lg font-semibold text-gray-900 font-poppins mb-4">Pending Reviews ({pendingReviews.length})</h2>
           {pendingReviews.length === 0 ? (
-            <div className="p-10 bg-white rounded-2xl text-center border-dashed border-2 text-gray-500">No regular pending reviews.</div>
+            <div className="p-10 bg-white rounded-2xl text-center border-dashed border-2 text-gray-400">No regular pending reviews. Great job!</div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {pendingReviews.map((attempt: any) => (
                 <div key={attempt.id} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                   <h3 className="text-lg font-bold text-gray-900 mb-1">{attempt.evaluations.title}</h3>
-                  <p className="text-sm text-gray-600 mb-4"><span className="font-medium">Agent:</span> {attempt.profiles?.full_name}</p>
-                  <Link href={`/qa/review/${attempt.attempt_id}`} className="block text-center bg-shikho-magenta-500 text-white py-2 rounded-lg font-bold hover:bg-shikho-magenta-600">Start Reviewing</Link>
+                  <p className="text-sm text-gray-600 mb-4"><span className="font-medium">Agent:</span> {attempt.profiles?.full_name || attempt.profiles?.email}</p>
+                  <Link href={`/qa/review/${attempt.attempt_id}`} className="block text-center bg-shikho-magenta-500 text-white py-2.5 rounded-lg font-bold hover:bg-shikho-magenta-600 transition-colors shadow-sm">Start Reviewing</Link>
                 </div>
               ))}
             </div>
@@ -72,14 +85,18 @@ export default async function QADashboard() {
                 <tr><th className="p-4">Exam Title</th><th className="p-4">Agent Name</th><th className="p-4">Score Given</th><th className="p-4 text-right">Action</th></tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {completedReviews.map((attempt: any) => (
-                  <tr key={attempt.id}>
-                    <td className="p-4 text-sm font-bold text-gray-900">{attempt.evaluations.title}</td>
-                    <td className="p-4 text-sm text-gray-600">{attempt.profiles?.full_name}</td>
-                    <td className="p-4 text-sm font-bold text-shikho-indigo-600">{attempt.overall_score}%</td>
-                    <td className="p-4 text-right"><Link href={`/qa/review/${attempt.attempt_id}`} className="text-xs text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg hover:bg-blue-100">View Finalized Copy</Link></td>
-                  </tr>
-                ))}
+                {completedReviews.length === 0 ? (
+                  <tr><td colSpan={4} className="p-8 text-center text-gray-400 text-sm">No completed reviews yet.</td></tr>
+                ) : (
+                  completedReviews.map((attempt: any) => (
+                    <tr key={attempt.id} className="hover:bg-gray-50">
+                      <td className="p-4 text-sm font-bold text-gray-900">{attempt.evaluations.title}</td>
+                      <td className="p-4 text-sm text-gray-600">{attempt.profiles?.full_name || attempt.profiles?.email}</td>
+                      <td className="p-4 text-sm font-bold text-shikho-indigo-600">{attempt.overall_score}%</td>
+                      <td className="p-4 text-right"><Link href={`/qa/review/${attempt.attempt_id}`} className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-2 rounded-lg hover:bg-blue-100 transition-colors">View Finalized Copy</Link></td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
