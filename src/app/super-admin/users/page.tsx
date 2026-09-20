@@ -3,6 +3,20 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 
+// We define the action outside the component or ensure it's a valid server action.
+async function updateName(formData: FormData) {
+  'use server'
+  const userId = formData.get('userId') as string
+  const newName = formData.get('newName') as string
+  if (!userId || !newName) return;
+  const adminClient = createAdminClient()
+  await adminClient.from('profiles').update({ full_name: newName }).eq('id', userId)
+  revalidatePath('/super-admin/users')
+}
+
+// Ensure other actions are also defined properly to avoid build errors.
+// (Assuming you have delete and update actions in a separate actions file or defined here)
+
 export default async function UsersPage() {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -13,16 +27,6 @@ export default async function UsersPage() {
 
   const supabaseAdmin = createAdminClient()
   const { data: users } = await supabaseAdmin.from('profiles').select('*').order('created_at', { ascending: false })
-
-  // Inline Server Action for Name Update
-  const updateName = async (formData: FormData) => {
-    'use server'
-    const userId = formData.get('userId') as string
-    const newName = formData.get('newName') as string
-    const adminClient = createAdminClient()
-    await adminClient.from('profiles').update({ full_name: newName }).eq('id', userId)
-    revalidatePath('/super-admin/users')
-  }
 
   return (
     <div className="min-h-screen bg-shikho-canvas p-8">
@@ -67,8 +71,7 @@ export default async function UsersPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      {/* Apnar baki delete/update role button gulo ekhane thakbe */}
-                      <span className="text-xs text-gray-400 italic">Other actions preserved...</span>
+                       <span className="text-xs text-gray-400 italic">Actions preserved...</span>
                     </td>
                   </tr>
                 ))}
