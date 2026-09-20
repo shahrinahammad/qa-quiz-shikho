@@ -1,98 +1,59 @@
 'use server'
 
-import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import { sendPushNotification } from '@/app/actions/notification'
+import { redirect } from 'next/navigation'
+import { sendPushNotification } from '@/app/actions/notification' // 🔔 Push Notification Added
 
-export async function createEvaluation(formData: FormData): Promise<void> {
-  const supabaseAdmin = createAdminClient()
+export async function createEvaluation(formData: FormData) {
   const supabase = createClient()
-  
-  // ১. ফর্মের বদলে সরাসরি সার্ভার থেকে ইউজারের আইডি নিচ্ছি
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    console.error('User not authenticated')
-    return
-  }
+  if (!user) return redirect('/login')
 
   const title = formData.get('title') as string
-  const duration = parseInt(formData.get('duration') as string)
-  const passingScore = parseInt(formData.get('passing_score') as string)
-  const agentId = formData.get('agent_id') as string
+  const description = formData.get('description') as string
+  const duration_minutes = parseInt(formData.get('duration_minutes') as string)
+  const passing_score = parseInt(formData.get('passing_score') as string)
+  const agent_id = formData.get('agent_id') as string
   
-  // ২. Question ডাটা পার্সিং ফিক্স (JSON বা Checkbox Array দুটোই সাপোর্ট করবে)
-  const questionsData = formData.getAll('questions')
-  let questions: string[] = []
-  
-  if (questionsData.length === 1 && typeof questionsData[0] === 'string') {
-    try {
-      questions = questionsData[0] ? JSON.parse(questionsData[0]) : []
-    } catch(e) {
-      questions = []
-    }
-  } else {
-    questions = questionsData as string[]
+  // ফর্ম থেকে সিলেক্ট করা প্রশ্নগুলো নেওয়া[cite: 13]
+  const question_ids = formData.getAll('question_ids') as string[]
+
+  if (question_ids.length === 0) {
+    return redirect('/super-admin/evaluations?error=Please select at least one question.')
   }
 
-  if (!title || !duration || !passingScore || !agentId || questions.length === 0) {
-    console.error('Validation failed: Missing required fields')
-    return
-  }
+  const evaluation_id = `EVL-${Date.now().toString().slice(-6)}`
 
+  const { data: evalData, error: evalError } = await supabase
+    .from('evaluations')
+    .insert({ evaluation_id, title, description, duration_minutes, passing_score, created_by: user.id, status: 'ASSIGNED', question_ids })
+    .select().single()
+
+  if (evalError) return redirect(`/super-admin/evaluations?error=${evalError.message}`)
+
+  const attempt_id = `ATT-${Math.floor(1000 + Math.random() * 9000)}`
+  
+  // qa_id: user.id যুক্ত করা হয়েছে ট্র্যাকিংয়ের জন্য
+  const { error: attemptError } = await supabase
+    .from('evaluation_attempts')
+    .insert({ attempt_id, evaluation_id: evalData.id, agent_id: agent_id, status: 'ASSIGNED', qa_id: user.id })
+
+  if (attemptError) return redirect(`/super-admin/evaluations?error=${attemptError.message}`)
+
+  // 🔔 Send Push Notification to Agent (Error handle kora ache jate main kaj fail na hoy)
   try {
-    // ৩. ইনসার্ট ডাটাবেস
-    const { data: evalData, error: evalError } = await supabaseAdmin
-      .from('evaluations')
-      .insert({
-        title,
-        duration_minutes: duration,
-        passing_score: passingScore,
-        created_by: user.id // সরাসরি সার্ভারের সিকিউর আইডি
-      })
-      .select()
-      .single()
-
-    if (evalError) throw evalError
-
-    const questionsToInsert = questions.map((qId: string) => ({
-      evaluation_id: evalData.id,
-      question_id: qId
-    }))
-
-    const { error: eqError } = await supabaseAdmin
-      .from('evaluation_questions')
-      .insert(questionsToInsert)
-
-    if (eqError) throw eqError
-
-    const { error: attemptError } = await supabaseAdmin
-      .from('evaluation_attempts')
-      .insert({
-        evaluation_id: evalData.id,
-        agent_id: agentId,
-        qa_id: user.id,
-        status: 'ASSIGNED'
-      })
-
-    if (attemptError) throw attemptError
-
-    // ৪. পুশ নোটিফিকেশন পাঠানো (Try-Catch এর ভেতরে যাতে এরর আসলেও ডাটা সেভ হয়)
-    try {
-      await sendPushNotification(
-        agentId, 
-        'New Exam Assigned 📝', 
-        `QA has assigned a new exam (${title}) for you. Please check your dashboard.`
-      )
-    } catch (notifyError) {
-      console.error('Notification failed but exam assigned:', notifyError)
-    }
-
-    // ৫. পেজ রিফ্রেশ করে নতুন ডাটা দেখানো
-    revalidatePath('/super-admin/evaluations')
-    revalidatePath('/qa/dashboard')
-    
-  } catch (err: any) {
-    console.error('Database Error:', err.message)
+    await sendPushNotification(
+      agent_id, 
+      'New Exam Assigned 📝', 
+      `QA has assigned a new exam (${title}) for you. Please check your dashboard.`
+    )
+  } catch (notifyError) {
+    console.error('Notification failed:', notifyError)
   }
+
+  revalidatePath('/super-admin/evaluations')
+  revalidatePath('/super-admin/dashboard')
+  
+  redirect('/super-admin/evaluations?success=Evaluation assigned successfully!')
 }
