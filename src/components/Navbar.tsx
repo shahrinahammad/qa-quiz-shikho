@@ -21,11 +21,9 @@ export default async function Navbar() {
   const role = profile?.role || 'agent'
   const supabaseAdmin = createAdminClient()
   
-  let notifCount = 0
   let notificationsList: any[] = []
   const dashboardLink = `/${role === 'super_admin' ? 'super-admin' : role}/dashboard`
 
-  // 🕒 Helper function for Bangladesh Time
   const formatBST = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-GB', { 
       timeZone: 'Asia/Dhaka', 
@@ -37,33 +35,32 @@ export default async function Navbar() {
     })
   }
 
-  // 🔔 Generate Notification Details based on Role
+  // 1. Fetch all profiles for quick mapping (To get Assigner QA Name correctly)
+  const { data: allProfiles } = await supabaseAdmin.from('profiles').select('id, full_name')
+  const profileMap = allProfiles?.reduce((acc: any, p: any) => ({ ...acc, [p.id]: p.full_name || 'Admin' }), {}) || {}
+
   if (role === 'agent') {
-    // 👤 Agent: Sees ASSIGNED exams & REVIEWED (PUBLISHED) exams
     const { data: agentTasks } = await supabaseAdmin
       .from('evaluation_attempts')
-      .select('*, evaluations!inner(title), qa:profiles!evaluation_attempts_qa_id_fkey(full_name)')
+      .select('*, evaluations!inner(title, created_by)')
       .eq('agent_id', user.id)
       .in('status', ['ASSIGNED', 'PUBLISHED'])
       .order('created_at', { ascending: false })
       .limit(15)
     
-    notifCount = agentTasks?.length || 0
     notificationsList = agentTasks?.map(t => {
       const isReviewed = t.status === 'PUBLISHED'
+      const qaName = profileMap[t.evaluations?.created_by] || 'QA' // Fixed Assigner Name
       return {
         text: isReviewed 
-          ? `🎉 <strong>${t.qa?.full_name || 'QA'}</strong> finished reviewing your exam: <span className="italic text-green-600">${t.evaluations?.title}</span>`
-          : `📝 <strong>${t.qa?.full_name || 'QA'}</strong> assigned a new assessment to you: <span className="italic text-shikho-magenta-600">${t.evaluations?.title}</span>`,
+          ? `🎉 <strong>${qaName}</strong> finished reviewing your exam: <span className="italic text-green-600">${t.evaluations?.title}</span>`
+          : `📝 <strong>${qaName}</strong> assigned a new assessment to you: <span className="italic text-shikho-magenta-600">${t.evaluations?.title}</span>`,
         timeStr: isReviewed && t.submitted_at ? t.submitted_at : t.created_at,
         time: formatBST(isReviewed && t.submitted_at ? t.submitted_at : t.created_at)
       }
     })?.sort((a, b) => new Date(b.timeStr).getTime() - new Date(a.timeStr).getTime()) || []
     
   } else {
-    // 👑 Super Admin & QA: Sees ALL notifications (Assigned & Submitted)
-    
-    // 1. ALL Submitted/Recheck Exams
     const { data: qaTasks } = await supabaseAdmin
       .from('evaluation_attempts')
       .select('*, evaluations!inner(title, created_by), agent:profiles!evaluation_attempts_agent_id_fkey(full_name)')
@@ -71,10 +68,9 @@ export default async function Navbar() {
       .order('submitted_at', { ascending: false })
       .limit(10)
 
-    // 2. ALL Assigned Exams
     const { data: assignedTasks } = await supabaseAdmin
       .from('evaluation_attempts')
-      .select('*, evaluations!inner(title), qa:profiles!evaluation_attempts_qa_id_fkey(full_name), agent:profiles!evaluation_attempts_agent_id_fkey(full_name)')
+      .select('*, evaluations!inner(title, created_by), agent:profiles!evaluation_attempts_agent_id_fkey(full_name)')
       .eq('status', 'ASSIGNED')
       .order('created_at', { ascending: false })
       .limit(10)
@@ -87,14 +83,16 @@ export default async function Navbar() {
         timeStr: t.submitted_at || t.created_at,
         time: formatBST(t.submitted_at || t.created_at)
       })),
-      ...(assignedTasks || []).map(t => ({
-        text: `📝 <strong>${t.qa?.full_name || 'QA'}</strong> assigned <span className="italic text-shikho-magenta-600">${t.evaluations?.title}</span> to <strong>${t.agent?.full_name || 'Agent'}</strong>`,
-        timeStr: t.created_at,
-        time: formatBST(t.created_at)
-      }))
-    ].sort((a, b) => new Date(b.timeStr).getTime() - new Date(a.timeStr).getTime()).slice(0, 15) // Sort by newest, max 15
+      ...(assignedTasks || []).map(t => {
+        const qaName = profileMap[t.evaluations?.created_by] || 'QA' // Fixed Assigner Name
+        return {
+          text: `📝 <strong>${qaName}</strong> assigned <span className="italic text-shikho-magenta-600">${t.evaluations?.title}</span> to <strong>${t.agent?.full_name || 'Agent'}</strong>`,
+          timeStr: t.created_at,
+          time: formatBST(t.created_at)
+        }
+      })
+    ].sort((a, b) => new Date(b.timeStr).getTime() - new Date(a.timeStr).getTime()).slice(0, 15)
     
-    notifCount = allNotifs.length
     notificationsList = allNotifs
   }
 
@@ -118,6 +116,7 @@ export default async function Navbar() {
                   <Link href="/super-admin/question-bank" className="hover:text-shikho-indigo-600 transition-colors">Question Bank</Link>
                   <Link href="/super-admin/evaluations" className="hover:text-shikho-indigo-600 transition-colors">Evaluations</Link>
                   <Link href="/qa/dashboard" className="hover:text-shikho-magenta-500 transition-colors">Review Queue</Link>
+                  <Link href="/agent/dashboard" className="hover:text-shikho-sunrise-500 transition-colors">Agent View</Link> {/* Fixed Agent View Link */}
                 </>
               )}
               {role === 'qa' && (
@@ -135,12 +134,9 @@ export default async function Navbar() {
           </div>
 
           <div className="flex items-center gap-5">
-            
-            {/* 🔔 Client Component Bell Dropdown */}
             <NotificationBell 
-              count={notifCount} 
               notifications={notificationsList} 
-              dashboardLink={role === 'super_admin' ? '/qa/dashboard' : dashboardLink} 
+              dashboardLink={role === 'super_admin' ? '/super-admin/dashboard' : dashboardLink} 
             />
 
             <span className="text-xs font-semibold text-gray-700 bg-gray-100 px-3 py-1.5 rounded-full uppercase tracking-wider hidden sm:block">
