@@ -2,9 +2,9 @@
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
-import { sendPushNotification } from '@/app/actions/notification' // 🔔 Added Push Notification 
+import { sendPushNotification } from '@/app/actions/notification'
 
-export async function createEvaluation(formData: FormData) {
+export async function createEvaluation(formData: FormData): Promise<void> {
   const supabaseAdmin = createAdminClient()
   const title = formData.get('title') as string
   const duration = parseInt(formData.get('duration') as string)
@@ -14,12 +14,14 @@ export async function createEvaluation(formData: FormData) {
   const createdBy = formData.get('created_by') as string
 
   if (!title || !duration || !passingScore || !agentId || !questionsJson || !createdBy) {
-    return { success: false, error: 'All fields are required.' }
+    console.error('All fields are required.')
+    return
   }
 
   const questions = JSON.parse(questionsJson)
   if (!questions || questions.length === 0) {
-    return { success: false, error: 'Please select at least one question.' }
+    console.error('Please select at least one question.')
+    return
   }
 
   try {
@@ -66,8 +68,7 @@ export async function createEvaluation(formData: FormData) {
     )
 
     revalidatePath('/super-admin/evaluations')
-    return { success: true }
   } catch (err: any) {
-    return { success: false, error: err.message || 'Failed to assign evaluation.' }
+    console.error('Failed to assign evaluation:', err.message)
   }
 }
