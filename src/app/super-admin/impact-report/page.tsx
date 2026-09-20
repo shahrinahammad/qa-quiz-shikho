@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
+import PrintButton from './PrintButton'
 
 export default async function ImpactReportPage() {
   const supabase = createClient()
@@ -69,10 +70,8 @@ export default async function ImpactReportPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 py-10 flex justify-center">
-      {/* 📸 Ei card tir screenshot nilei picture format hoye jabe */}
       <div id="impact-report-card" className="bg-white w-full max-w-md rounded-3xl shadow-xl overflow-hidden border border-gray-100 relative">
         
-        {/* Header Section */}
         <div className="text-center pt-8 pb-6 px-6">
           <div className="flex justify-center items-center gap-2 mb-2">
              <Image src="/logo.png" alt="Shikho" width={100} height={35} className="object-contain" />
@@ -84,7 +83,6 @@ export default async function ImpactReportPage() {
           <p className="text-xs text-gray-400 mt-2 font-medium">{dateStr}</p>
         </div>
 
-        {/* Top Summary Blocks */}
         <div className="flex justify-between px-6 pb-6 border-b border-gray-100">
           <div className="text-center">
             <p className="text-[10px] font-bold text-shikho-indigo-600 uppercase tracking-wider mb-1">Assigned</p>
@@ -102,7 +100,6 @@ export default async function ImpactReportPage() {
           </div>
         </div>
 
-        {/* QA Performance List */}
         <div className="bg-shikho-magenta-50/30 p-2">
           <div className="bg-shikho-magenta-100 text-shikho-magenta-700 text-[10px] font-bold uppercase flex justify-between px-6 py-2 rounded-t-xl tracking-wider">
             <span className="w-1/2">QA TEAM</span>
@@ -142,14 +139,12 @@ export default async function ImpactReportPage() {
         </div>
       </div>
 
-      {/* Navigation back to dashboard */}
-      <div className="fixed top-6 left-6 flex flex-col gap-4">
+      {/* print:hidden add kora hoyeche jate ei button gulo picture-e na ashe */}
+      <div className="fixed top-6 left-6 flex flex-col gap-4 print:hidden">
         <Link href="/super-admin/dashboard" className="bg-gray-900 text-white px-5 py-2.5 rounded-full text-sm font-bold shadow-lg hover:bg-gray-800 transition-transform hover:scale-105">
           &larr; Back to Dashboard
         </Link>
-        <button onClick={() => window.print()} className="bg-shikho-magenta-500 text-white px-5 py-2.5 rounded-full text-sm font-bold shadow-lg hover:bg-shikho-magenta-600 transition-transform hover:scale-105">
-          🖨️ Print / Save as Image
-        </button>
+        <PrintButton />
       </div>
     </div>
   )
