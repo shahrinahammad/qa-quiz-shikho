@@ -16,8 +16,11 @@ export default async function SuperAdminDashboard({
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'super_admin') redirect('/login')
 
-  const from = searchParams.from || ''
-  const to = searchParams.to || ''
+  // 1. Default to Today's Date (Bangladesh Time)
+  const todayDate = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Dhaka' }) // Gives YYYY-MM-DD
+  const from = searchParams.from !== undefined ? searchParams.from : todayDate
+  const to = searchParams.to !== undefined ? searchParams.to : todayDate
+  
   const supabaseAdmin = createAdminClient()
   
   let query = supabaseAdmin
@@ -37,7 +40,6 @@ export default async function SuperAdminDashboard({
   const agentCompleted = reports?.filter(r => r.status !== 'ASSIGNED').length || 0
   const qaReviewed = reports?.filter(r => r.status === 'PUBLISHED').length || 0
 
-  // 1. QA Performance Data
   const qaPerformance: Record<string, any> = {}
   reports?.forEach((r: any) => {
     const assignerId = r.evaluations?.created_by;
@@ -54,7 +56,6 @@ export default async function SuperAdminDashboard({
   })
   const qaReportArray = Object.values(qaPerformance)
 
-  // 2. WhatsApp Report Generation
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   
@@ -96,7 +97,6 @@ export default async function SuperAdminDashboard({
     <div className="min-h-screen bg-shikho-canvas p-8">
       <div className="max-w-7xl mx-auto space-y-8">
         
-        {/* Header & Date Filter */}
         <header className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h1 className="text-2xl font-bold text-shikho-indigo-600 font-poppins">Super Admin Dashboard</h1>
@@ -113,11 +113,10 @@ export default async function SuperAdminDashboard({
               <input type="date" name="to" defaultValue={to} className="px-3 py-1.5 border rounded-lg text-sm bg-white" />
             </div>
             <button type="submit" className="bg-shikho-indigo-600 text-white px-4 py-1.5 rounded-lg text-sm font-bold hover:bg-shikho-indigo-700">Filter</button>
-            {(from || to) && <Link href="/super-admin/dashboard" className="text-xs font-bold text-red-500 hover:underline px-2 pb-1">Clear</Link>}
+            <Link href="/super-admin/dashboard" className="text-xs font-bold text-red-500 hover:underline px-2 pb-1">Reset</Link>
           </form>
         </header>
 
-        {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-4">
           <Link href="/super-admin/impact-report" className="flex items-center gap-2 bg-gradient-to-r from-shikho-indigo-600 to-shikho-magenta-500 text-white px-6 py-3 rounded-xl font-bold hover:shadow-lg transition-all shadow-sm text-sm font-poppins">
             📸 View Visual Impact Report (Image Format)
@@ -130,14 +129,12 @@ export default async function SuperAdminDashboard({
           </a>
         </div>
 
-        {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100"><p className="text-sm text-gray-500 font-bold">Total Assigned</p><p className="text-3xl font-black text-gray-900">{total}</p></div>
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100"><p className="text-sm text-gray-500 font-bold">Agent Submitted</p><p className="text-3xl font-black text-blue-600">{agentCompleted}</p></div>
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100"><p className="text-sm text-gray-500 font-bold">QA Reviewed</p><p className="text-3xl font-black text-green-600">{qaReviewed}</p></div>
         </div>
 
-        {/* QA Performance Table */}
         {qaReportArray.length > 0 && (
           <div className="bg-white rounded-2xl shadow-sm border border-shikho-magenta-100 overflow-hidden">
             <div className="p-6 border-b border-gray-100 bg-shikho-magenta-50/30">
@@ -170,7 +167,6 @@ export default async function SuperAdminDashboard({
           </div>
         )}
 
-        {/* Detailed Tracking Table */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="p-6 border-b border-gray-100"><h2 className="text-lg font-semibold text-gray-900 font-poppins">Assignment & Review Tracking</h2></div>
           <div className="overflow-x-auto">
@@ -196,7 +192,6 @@ export default async function SuperAdminDashboard({
                     <td className="px-6 py-4 text-sm text-gray-700">{row.agent?.full_name || 'N/A'}</td>
                     <td className="px-6 py-4 text-xs font-bold">{row.status === 'ASSIGNED' ? <span className="text-red-500">❌ Pending</span> : <span className="text-green-600">✅ Submitted</span>}</td>
                     
-                    {/* 🛠️ Recheck Status Fix */}
                     <td className="px-6 py-4 text-xs font-bold">
                       {row.status === 'PUBLISHED' ? (
                         <span className="text-green-600">✅ Reviewed ({row.qa?.full_name || 'QA'})</span>
@@ -210,12 +205,15 @@ export default async function SuperAdminDashboard({
                     <td className="px-6 py-4 text-sm font-bold text-shikho-indigo-600">{row.overall_score !== null ? `${row.overall_score}%` : '-'}</td>
                     
                     <td className="px-6 py-4 text-right flex justify-end gap-2 items-center">
-                      {/* 🛠️ View Button added for Admin */}
-                      {row.status !== 'ASSIGNED' && (
-                        <Link href={`/qa/review/${row.attempt_id}`} className="text-[10px] font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded hover:bg-blue-100 transition-colors uppercase tracking-wider">
-                          View
-                        </Link>
-                      )}
+                      
+                      {/* 🛠️ Dynamic Live View logic */}
+                      <Link 
+                        href={row.status === 'ASSIGNED' ? `/agent/evaluation/${row.attempt_id}` : row.status === 'UNDER_QA_REVIEW' ? `/qa/review/${row.attempt_id}` : `/agent/result/${row.attempt_id}`}
+                        className="text-[10px] font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded hover:bg-blue-100 transition-colors uppercase tracking-wider"
+                      >
+                        View
+                      </Link>
+                      
                       <form action={deleteEvaluationAttempt}>
                         <input type="hidden" name="attempt_id" value={row.attempt_id} />
                         <button type="submit" className="text-[10px] font-bold text-red-600 bg-red-50 px-3 py-1.5 rounded hover:bg-red-100 transition-colors uppercase tracking-wider">Delete</button>
