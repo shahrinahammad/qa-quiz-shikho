@@ -39,20 +39,26 @@ export default async function Navbar() {
 
   // 🔔 Generate Notification Details based on Role
   if (role === 'agent') {
-    // 👤 Agent: Sees ONLY exams assigned to THEM
-    const { data: pendingTasks } = await supabaseAdmin
+    // 👤 Agent: Sees ASSIGNED exams & REVIEWED (PUBLISHED) exams
+    const { data: agentTasks } = await supabaseAdmin
       .from('evaluation_attempts')
       .select('*, evaluations!inner(title), qa:profiles!evaluation_attempts_qa_id_fkey(full_name)')
       .eq('agent_id', user.id)
-      .eq('status', 'ASSIGNED')
+      .in('status', ['ASSIGNED', 'PUBLISHED'])
       .order('created_at', { ascending: false })
-      .limit(10)
+      .limit(15)
     
-    notifCount = pendingTasks?.length || 0
-    notificationsList = pendingTasks?.map(t => ({
-      text: `<strong>${t.qa?.full_name || 'QA'}</strong> assigned a new assessment to you: <span className="italic text-shikho-magenta-600">${t.evaluations?.title}</span>`,
-      time: formatBST(t.created_at)
-    })) || []
+    notifCount = agentTasks?.length || 0
+    notificationsList = agentTasks?.map(t => {
+      const isReviewed = t.status === 'PUBLISHED'
+      return {
+        text: isReviewed 
+          ? `🎉 <strong>${t.qa?.full_name || 'QA'}</strong> finished reviewing your exam: <span className="italic text-green-600">${t.evaluations?.title}</span>`
+          : `📝 <strong>${t.qa?.full_name || 'QA'}</strong> assigned a new assessment to you: <span className="italic text-shikho-magenta-600">${t.evaluations?.title}</span>`,
+        timeStr: isReviewed && t.submitted_at ? t.submitted_at : t.created_at,
+        time: formatBST(isReviewed && t.submitted_at ? t.submitted_at : t.created_at)
+      }
+    })?.sort((a, b) => new Date(b.timeStr).getTime() - new Date(a.timeStr).getTime()) || []
     
   } else {
     // 👑 Super Admin & QA: Sees ALL notifications (Assigned & Submitted)
