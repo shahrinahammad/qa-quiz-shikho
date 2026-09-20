@@ -40,6 +40,7 @@ export default async function SuperAdminDashboard({
   
   const { data: reports } = await query
   
+  // কে খাতা Assign করেছে তা বের করার জন্য সব ইউজারের লিস্ট আনা
   const { data: profiles } = await supabaseAdmin.from('profiles').select('id, full_name')
   const profileMap = profiles?.reduce((acc: any, p: any) => ({ ...acc, [p.id]: p.full_name || 'Admin' }), {}) || {}
 
@@ -47,27 +48,65 @@ export default async function SuperAdminDashboard({
   const agentCompleted = reports?.filter(r => r.status !== 'ASSIGNED').length || 0
   const qaReviewed = reports?.filter(r => r.status === 'PUBLISHED').length || 0
 
-  // 📊 QA-wise Performance Report তৈরি করার লজিক
+  // 📊 1. QA-wise Detailed Performance Report
   const qaPerformance: Record<string, any> = {}
   reports?.forEach((r: any) => {
-    if (r.status === 'PUBLISHED' && r.qa_id && r.qa) {
-      if (!qaPerformance[r.qa_id]) {
-        qaPerformance[r.qa_id] = { name: r.qa.full_name, totalReviewed: 0, totalScore: 0 }
+    const assignerId = r.evaluations?.created_by;
+    const assignerName = profileMap[assignerId] || 'Admin / Unknown';
+
+    if (!qaPerformance[assignerId]) {
+      qaPerformance[assignerId] = {
+        name: assignerName,
+        totalAssigned: 0,
+        totalSubmitted: 0,
+        totalReviewed: 0,
+        totalRecheck: 0
       }
-      qaPerformance[r.qa_id].totalReviewed += 1
-      qaPerformance[r.qa_id].totalScore += (r.overall_score || 0)
     }
+
+    qaPerformance[assignerId].totalAssigned += 1
+
+    if (r.status !== 'ASSIGNED') qaPerformance[assignerId].totalSubmitted += 1
+    if (r.status === 'PUBLISHED') qaPerformance[assignerId].totalReviewed += 1
+    if (r.status === 'RECHECK_REQUESTED') qaPerformance[assignerId].totalRecheck += 1
   })
+
+  const qaReportArray = Object.values(qaPerformance)
+
+  // 📱 2 & 3. WhatsApp Report Logic
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
   
-  const qaReportArray = Object.values(qaPerformance).map(qa => ({
-    ...qa,
-    avgScore: Math.round(qa.totalScore / qa.totalReviewed)
-  }))
+  const sevenDaysAgo = new Date()
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+  sevenDaysAgo.setHours(0, 0, 0, 0)
+
+  const dailyReports = reports?.filter(r => new Date(r.created_at) >= today) || []
+  const weeklyReports = reports?.filter(r => new Date(r.created_at) >= sevenDaysAgo) || []
+
+  const generateWaText = (data: any[], title: string) => {
+    const assigned = data.length
+    const submitted = data.filter(r => r.status !== 'ASSIGNED').length
+    const reviewed = data.filter(r => r.status === 'PUBLISHED').length
+    const disputes = data.filter(r => r.status === 'RECHECK_REQUESTED').length
+
+    let text = `📊 *${title}*\n\n`
+    text += `🎯 Total Assigned: ${assigned}\n`
+    text += `✅ Agent Submitted: ${submitted}\n`
+    text += `🔎 QA Reviewed: ${reviewed}\n`
+    text += `⚠️ Recheck Issues: ${disputes}\n\n`
+    text += `_Generated from Shikho QA Portal_`
+    return encodeURIComponent(text)
+  }
+
+  const dailyWaLink = `https://wa.me/?text=${generateWaText(dailyReports, `Shikho QA Daily Report - ${new Date().toLocaleDateString()}`)}`
+  const weeklyWaLink = `https://wa.me/?text=${generateWaText(weeklyReports, `Shikho QA Weekly Report (Last 7 Days)`)}`
 
   return (
     <div className="min-h-screen bg-shikho-canvas p-8">
       <div className="max-w-7xl mx-auto space-y-8">
         
+        {/* Header & Date Filter */}
         <header className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center flex-wrap gap-4">
           <div>
             <h1 className="text-2xl font-bold text-shikho-indigo-600 font-poppins">Super Admin Dashboard</h1>
@@ -83,30 +122,43 @@ export default async function SuperAdminDashboard({
               <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">To Date</label>
               <input type="date" name="to" defaultValue={to} className="px-3 py-1.5 border rounded-lg text-sm bg-white" />
             </div>
-            <button type="submit" className="bg-shikho-indigo-600 text-white px-4 py-1.5 rounded-lg text-sm font-bold hover:bg-shikho-indigo-700">Filter</button>
+            <button type="submit" className="bg-shikho-indigo-600 text-white px-4 py-1.5 rounded-lg text-sm font-bold hover:bg-shikho-indigo-700">
+              Filter
+            </button>
             {(from || to) && (
               <Link href="/super-admin/dashboard" className="text-xs font-bold text-red-500 hover:underline px-2">Clear</Link>
             )}
           </form>
         </header>
 
-        {/* Dynamic Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-            <p className="text-sm text-gray-500 font-bold">Total Assigned</p>
-            <p className="text-3xl font-black text-gray-900">{total}</p>
+        {/* Dynamic Summary Cards & WhatsApp Action Buttons */}
+        <div>
+          <div className="flex flex-wrap gap-4 mb-4">
+            <a href={dailyWaLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 bg-[#25D366] text-white px-5 py-2.5 rounded-lg font-bold hover:bg-[#1da851] transition-colors shadow-sm text-sm font-poppins">
+              💬 Share Daily Report (WhatsApp)
+            </a>
+            <a href={weeklyWaLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 bg-[#128C7E] text-white px-5 py-2.5 rounded-lg font-bold hover:bg-[#0c6b5e] transition-colors shadow-sm text-sm font-poppins">
+              📊 Share Weekly Report (WhatsApp)
+            </a>
           </div>
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-            <p className="text-sm text-gray-500 font-bold">Agent Submitted</p>
-            <p className="text-3xl font-black text-blue-600">{agentCompleted}</p>
-          </div>
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-            <p className="text-sm text-gray-500 font-bold">QA Reviewed</p>
-            <p className="text-3xl font-black text-green-600">{qaReviewed}</p>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+              <p className="text-sm text-gray-500 font-bold">Total Assigned</p>
+              <p className="text-3xl font-black text-gray-900">{total}</p>
+            </div>
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+              <p className="text-sm text-gray-500 font-bold">Agent Submitted</p>
+              <p className="text-3xl font-black text-blue-600">{agentCompleted}</p>
+            </div>
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+              <p className="text-sm text-gray-500 font-bold">QA Reviewed</p>
+              <p className="text-3xl font-black text-green-600">{qaReviewed}</p>
+            </div>
           </div>
         </div>
 
-        {/* 📊 NEW: QA Performance Report */}
+        {/* 📊 UPDATED: QA Performance Report */}
         {qaReportArray.length > 0 && (
           <div className="bg-white rounded-2xl shadow-sm border border-shikho-magenta-100 overflow-hidden">
             <div className="p-6 border-b border-gray-100 bg-shikho-magenta-50/30">
@@ -114,19 +166,23 @@ export default async function SuperAdminDashboard({
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left">
-                <thead className="bg-gray-50 text-gray-600 text-xs uppercase font-poppins">
+                <thead className="bg-gray-50 text-gray-600 text-[11px] uppercase font-bold font-poppins tracking-wider">
                   <tr>
                     <th className="px-6 py-4">QA Name</th>
-                    <th className="px-6 py-4">Total Exams Reviewed</th>
-                    <th className="px-6 py-4">Average Score Given</th>
+                    <th className="px-6 py-4 text-center">Total Assign</th>
+                    <th className="px-6 py-4 text-center">Total Agent Submitted</th>
+                    <th className="px-6 py-4 text-center">Total QA Review</th>
+                    <th className="px-6 py-4 text-center">Re-check Issues</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {qaReportArray.map((qa: any, idx: number) => (
                     <tr key={idx} className="hover:bg-gray-50">
                       <td className="px-6 py-4 text-sm font-bold text-gray-900">{qa.name}</td>
-                      <td className="px-6 py-4 text-sm text-blue-600 font-bold">{qa.totalReviewed}</td>
-                      <td className="px-6 py-4 text-sm text-green-600 font-bold">{qa.avgScore}%</td>
+                      <td className="px-6 py-4 text-sm font-bold text-gray-600 text-center">{qa.totalAssigned}</td>
+                      <td className="px-6 py-4 text-sm text-blue-600 font-bold text-center">{qa.totalSubmitted}</td>
+                      <td className="px-6 py-4 text-sm text-green-600 font-bold text-center">{qa.totalReviewed}</td>
+                      <td className="px-6 py-4 text-sm text-orange-600 font-bold text-center">{qa.totalRecheck}</td>
                     </tr>
                   ))}
                 </tbody>
