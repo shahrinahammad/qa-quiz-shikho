@@ -15,20 +15,27 @@ export async function GET(request: Request) {
     return NextResponse.json({ success: true, message: 'No pending exams found.' })
   }
 
-  // Send push notification to all pending agents
   let sentCount = 0
   
-  // 🛠️ FIXED: Added 'as any[]' to bypass strict TS checking
-  for (const exam of pendingExams as any[]) {
-    try {
-      await sendPushNotification(
-        exam.agent_id,
-        '⏳ Exam Reminder!',
-        `Your exam "${exam.evaluations?.title}" is still pending. Please submit it ASAP.`
-      )
-      sentCount++
-    } catch (error) {
-      console.error('Failed to remind agent:', exam.agent_id)
+  for (const item of pendingExams) {
+    const exam: any = item // 🛠️ Bulletproof TypeScript bypass
+    
+    // Supabase array ba object ja-i return koruk, amra title ber kore nibo
+    const examTitle = Array.isArray(exam.evaluations) 
+      ? exam.evaluations[0]?.title 
+      : exam.evaluations?.title
+
+    if (examTitle) {
+      try {
+        await sendPushNotification(
+          exam.agent_id,
+          '⏳ Exam Reminder!',
+          `Your exam "${examTitle}" is still pending. Please submit it ASAP.`
+        )
+        sentCount++
+      } catch (error) {
+        console.error('Failed to remind agent:', exam.agent_id)
+      }
     }
   }
 
