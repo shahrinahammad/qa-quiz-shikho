@@ -24,12 +24,16 @@ export default async function QADashboard({
   const to = searchParams.to || ''
   const supabaseAdmin = createAdminClient()
   
+  // Fetch all profiles for name mapping (To show Assigner Name)
+  const { data: profiles } = await supabaseAdmin.from('profiles').select('id, full_name')
+  const profileMap = profiles?.reduce((acc: any, p: any) => ({ ...acc, [p.id]: p.full_name || 'Admin' }), {}) || {}
+
   // 1. Pending & Disputes (No Date Filter)
   const { data: allTasks } = await supabaseAdmin
     .from('evaluation_attempts')
     .select(`
       *, 
-      evaluations (title, duration_minutes, passing_score), 
+      evaluations!inner (title, duration_minutes, passing_score, created_by), 
       profiles!evaluation_attempts_agent_id_fkey (full_name, email),
       qa:profiles!evaluation_attempts_qa_id_fkey (full_name)
     `)
@@ -39,7 +43,18 @@ export default async function QADashboard({
   const pendingReviews = allTasks?.filter(t => t.status === 'UNDER_QA_REVIEW') || []
   const recheckRequests = allTasks?.filter(t => t.status === 'RECHECK_REQUESTED') || []
 
-  // 2. Tracking Report (Date Filtered - Only exams created by THIS QA)
+  // 2. Personal Stats for logged-in QA (Overall Summary)
+  const { data: myStats } = await supabaseAdmin
+    .from('evaluation_attempts')
+    .select('status, evaluations!inner(created_by)')
+    .eq('evaluations.created_by', user.id)
+
+  const myTotalAssigned = myStats?.length || 0
+  const myAgentSubmitted = myStats?.filter(t => t.status !== 'ASSIGNED').length || 0
+  const myQAReviewed = myStats?.filter(t => t.status === 'PUBLISHED').length || 0
+  const myPendingAction = myStats?.filter(t => t.status === 'UNDER_QA_REVIEW' || t.status === 'RECHECK_REQUESTED').length || 0
+
+  // 3. Tracking Report (Date Filtered - Only exams created by THIS QA)
   let trackingQuery = supabaseAdmin
     .from('evaluation_attempts')
     .select(`
@@ -58,7 +73,7 @@ export default async function QADashboard({
 
   return (
     <div className="min-h-screen bg-shikho-canvas p-8">
-      <div className="max-w-7xl mx-auto space-y-12">
+      <div className="max-w-7xl mx-auto space-y-8">
         
         <header className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
@@ -66,6 +81,26 @@ export default async function QADashboard({
             <p className="text-gray-500 text-sm mt-1">Manage pending evaluations and track your assigned exams.</p>
           </div>
         </header>
+
+        {/* 📊 NEW: QA Personal Summary Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+            <p className="text-sm text-gray-500 font-bold">Total Assigned By Me</p>
+            <p className="text-3xl font-black text-gray-900">{myTotalAssigned}</p>
+          </div>
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+            <p className="text-sm text-gray-500 font-bold">Agent Submitted</p>
+            <p className="text-3xl font-black text-blue-600">{myAgentSubmitted}</p>
+          </div>
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+            <p className="text-sm text-gray-500 font-bold">Reviewed / Done</p>
+            <p className="text-3xl font-black text-green-600">{myQAReviewed}</p>
+          </div>
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-shikho-magenta-100 bg-shikho-magenta-50/20">
+            <p className="text-sm text-shikho-magenta-600 font-bold">Action Needed (Pending)</p>
+            <p className="text-3xl font-black text-shikho-magenta-600">{myPendingAction}</p>
+          </div>
+        </div>
 
         {/* Recheck Requests (Disputes) */}
         {recheckRequests.length > 0 && (
@@ -75,9 +110,11 @@ export default async function QADashboard({
               {recheckRequests.map((attempt: any) => (
                 <div key={attempt.id} className="bg-orange-50 p-6 rounded-2xl border-2 border-orange-200">
                   <h3 className="text-lg font-bold text-gray-900 mb-1">{attempt.evaluations.title}</h3>
-                  <p className="text-sm text-gray-600 mb-4">
-                    <span className="font-medium">Agent:</span> {attempt.profiles?.full_name || attempt.profiles?.email}
-                  </p>
+                  <div className="mb-4">
+                    <p className="text-sm text-gray-600"><span className="font-bold">Agent:</span> {attempt.profiles?.full_name || attempt.profiles?.email}</p>
+                    {/* 👤 NEW: Assigner Name */}
+                    <p className="text-sm text-gray-600"><span className="font-bold">Assigned By:</span> <span className="text-shikho-magenta-600">{profileMap[attempt.evaluations.created_by]}</span></p>
+                  </div>
                   
                   {attempt.agent_feedback && (
                     <div className="bg-white p-3 rounded-lg border border-orange-100 mb-4 text-sm text-gray-700">
@@ -107,7 +144,11 @@ export default async function QADashboard({
               {pendingReviews.map((attempt: any) => (
                 <div key={attempt.id} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                   <h3 className="text-lg font-bold text-gray-900 mb-1">{attempt.evaluations.title}</h3>
-                  <p className="text-sm text-gray-600 mb-4"><span className="font-medium">Agent:</span> {attempt.profiles?.full_name || attempt.profiles?.email}</p>
+                  <div className="mb-4">
+                    <p className="text-sm text-gray-600"><span className="font-bold">Agent:</span> {attempt.profiles?.full_name || attempt.profiles?.email}</p>
+                    {/* 👤 NEW: Assigner Name */}
+                    <p className="text-sm text-gray-600"><span className="font-bold">Assigned By:</span> <span className="text-shikho-magenta-600">{profileMap[attempt.evaluations.created_by]}</span></p>
+                  </div>
                   <Link href={`/qa/review/${attempt.attempt_id}`} className="block text-center bg-shikho-magenta-500 text-white py-2.5 rounded-lg font-bold hover:bg-shikho-magenta-600 transition-colors shadow-sm">
                     Start Reviewing
                   </Link>
@@ -173,8 +214,10 @@ export default async function QADashboard({
                       <td className="p-4 text-xs font-bold">
                         {row.status === 'PUBLISHED' ? (
                           <span className="text-green-600">✅ Done by {row.qa?.full_name || 'QA'}</span>
+                        ) : row.status === 'RECHECK_REQUESTED' ? (
+                          <span className="text-orange-600">⚠️ Recheck Requested</span>
                         ) : (
-                          <span className="text-orange-500">⏳ Pending Review</span>
+                          <span className="text-gray-500">⏳ Pending Review</span>
                         )}
                       </td>
                       
