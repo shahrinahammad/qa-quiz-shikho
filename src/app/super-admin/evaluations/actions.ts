@@ -16,7 +16,7 @@ export async function createEvaluation(formData: FormData) {
   const passing_score = parseInt(formData.get('passing_score') as string)
   const agent_id = formData.get('agent_id') as string
   
-  // ফর্ম থেকে সিলেক্ট করা প্রশ্নগুলো নেওয়া[cite: 13]
+  // ফর্ম থেকে সিলেক্ট করা প্রশ্নগুলো নেওয়া
   const question_ids = formData.getAll('question_ids') as string[]
 
   if (question_ids.length === 0) {
