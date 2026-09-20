@@ -117,7 +117,7 @@ export default async function SuperAdminDashboard({
           </form>
         </header>
 
-        {/* Action Buttons: WhatsApp & Visual Report */}
+        {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-4">
           <Link href="/super-admin/impact-report" className="flex items-center gap-2 bg-gradient-to-r from-shikho-indigo-600 to-shikho-magenta-500 text-white px-6 py-3 rounded-xl font-bold hover:shadow-lg transition-all shadow-sm text-sm font-poppins">
             📸 View Visual Impact Report (Image Format)
@@ -176,7 +176,16 @@ export default async function SuperAdminDashboard({
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead className="bg-shikho-indigo-50 text-gray-600 text-xs uppercase font-poppins">
-                <tr><th className="px-6 py-4">Date</th><th className="px-6 py-4">Exam Title</th><th className="px-6 py-4">Assigned By</th><th className="px-6 py-4">Agent Name</th><th className="px-6 py-4">Agent Task</th><th className="px-6 py-4">QA Review</th><th className="px-6 py-4">Score</th><th className="px-6 py-4 text-right">Action</th></tr>
+                <tr>
+                  <th className="px-6 py-4">Date</th>
+                  <th className="px-6 py-4">Exam Title</th>
+                  <th className="px-6 py-4">Assigned By</th>
+                  <th className="px-6 py-4">Agent Name</th>
+                  <th className="px-6 py-4">Agent Task</th>
+                  <th className="px-6 py-4">QA Review</th>
+                  <th className="px-6 py-4">Score</th>
+                  <th className="px-6 py-4 text-right">Action</th>
+                </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {reports?.length === 0 ? <tr><td colSpan={8} className="p-6 text-center text-gray-400 text-sm">No data found for selected dates.</td></tr> : reports?.map((row: any) => (
@@ -186,12 +195,30 @@ export default async function SuperAdminDashboard({
                     <td className="px-6 py-4 text-sm text-gray-700">{profileMap[row.evaluations?.created_by] || 'Admin'}</td>
                     <td className="px-6 py-4 text-sm text-gray-700">{row.agent?.full_name || 'N/A'}</td>
                     <td className="px-6 py-4 text-xs font-bold">{row.status === 'ASSIGNED' ? <span className="text-red-500">❌ Pending</span> : <span className="text-green-600">✅ Submitted</span>}</td>
-                    <td className="px-6 py-4 text-xs font-bold">{row.status === 'PUBLISHED' ? <span className="text-green-600">✅ Reviewed ({row.qa?.full_name || 'QA'})</span> : <span className="text-orange-500">⏳ Pending Review</span>}</td>
+                    
+                    {/* 🛠️ Recheck Status Fix */}
+                    <td className="px-6 py-4 text-xs font-bold">
+                      {row.status === 'PUBLISHED' ? (
+                        <span className="text-green-600">✅ Reviewed ({row.qa?.full_name || 'QA'})</span>
+                      ) : row.status === 'RECHECK_REQUESTED' ? (
+                        <span className="text-orange-600">⚠️ Recheck Requested</span>
+                      ) : (
+                        <span className="text-gray-500">⏳ Pending Review</span>
+                      )}
+                    </td>
+                    
                     <td className="px-6 py-4 text-sm font-bold text-shikho-indigo-600">{row.overall_score !== null ? `${row.overall_score}%` : '-'}</td>
-                    <td className="px-6 py-4 text-right">
+                    
+                    <td className="px-6 py-4 text-right flex justify-end gap-2 items-center">
+                      {/* 🛠️ View Button added for Admin */}
+                      {row.status !== 'ASSIGNED' && (
+                        <Link href={`/qa/review/${row.attempt_id}`} className="text-[10px] font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded hover:bg-blue-100 transition-colors uppercase tracking-wider">
+                          View
+                        </Link>
+                      )}
                       <form action={deleteEvaluationAttempt}>
                         <input type="hidden" name="attempt_id" value={row.attempt_id} />
-                        <button type="submit" className="text-xs font-bold text-red-600 bg-red-50 px-3 py-1.5 rounded hover:bg-red-100 transition-colors">Delete</button>
+                        <button type="submit" className="text-[10px] font-bold text-red-600 bg-red-50 px-3 py-1.5 rounded hover:bg-red-100 transition-colors uppercase tracking-wider">Delete</button>
                       </form>
                     </td>
                   </tr>
