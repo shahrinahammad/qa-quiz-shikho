@@ -11,14 +11,34 @@ export default function NotificationBell({
   dashboardLink: string 
 }) {
   const [isOpen, setIsOpen] = useState(false)
-  const [unreadCount, setUnreadCount] = useState(notifications.length)
+  const [unreadCount, setUnreadCount] = useState(0)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    setUnreadCount(notifications.length)
+    if (notifications.length > 0) {
+      const lastReadTime = localStorage.getItem('shikho_last_read_notif')
+      const latestTime = notifications[0].timeStr
+      
+      if (lastReadTime === latestTime) {
+        setUnreadCount(0)
+      } else {
+        if (!lastReadTime) {
+          setUnreadCount(notifications.length)
+        } else {
+          // Count only new notifications since last read
+          const newCount = notifications.filter(n => new Date(n.timeStr).getTime() > new Date(lastReadTime).getTime()).length
+          setUnreadCount(newCount)
+        }
+      }
+    } else {
+      setUnreadCount(0)
+    }
   }, [notifications])
 
   const handleMarkAsRead = () => {
+    if (notifications.length > 0) {
+      localStorage.setItem('shikho_last_read_notif', notifications[0].timeStr)
+    }
     setUnreadCount(0)
   }
 
