@@ -22,7 +22,9 @@ export default async function Navbar() {
   // 🔔 Notification Engine: Automatically calculates pending actions
   const supabaseAdmin = createAdminClient()
   let notifCount = 0
-  let notifLink = `/${role === 'super_admin' ? 'super-admin' : role}/dashboard`
+  
+  // ডাইনামিক লিংক: যার যার ড্যাশবোর্ডে যাবে
+  const notifLink = `/${role === 'super_admin' ? 'super-admin' : role}/dashboard`
 
   if (role === 'agent') {
     // Agent Notification: Assigned but not submitted yet
@@ -43,9 +45,6 @@ export default async function Navbar() {
     // QA will only see notifications for exams they assigned
     if (role === 'qa') {
       query = query.eq('evaluations.created_by', user.id)
-      notifLink = '/qa/dashboard'
-    } else {
-      notifLink = '/qa/dashboard' // Super Admin can see all in Review Queue
     }
 
     const { count } = await query
@@ -54,7 +53,6 @@ export default async function Navbar() {
 
   return (
     <>
-      {/* 🚀 Background Push Notification Manager */}
       <PushNotificationManager userId={user.id} />
       
       <nav className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm font-poppins sticky top-0 z-50">
