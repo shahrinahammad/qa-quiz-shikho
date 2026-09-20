@@ -9,22 +9,27 @@ export default function PrintButton() {
   const copyImage = async () => {
     setIsCopying(true)
     try {
-      const element = document.getElementById('impact-report-card')
-      if (!element) {
-          alert('Report card not found!')
-          setIsCopying(false)
-          return
-      }
+      // ক্যানভাস কাটার আগে পেজটিকে একদম উপরে নিয়ে যাবে, যাতে পজিশন ঠিক থাকে
+      window.scrollTo(0, 0)
       
-      const canvas = await html2canvas(element, { scale: 2, useCORS: true })
+      const element = document.getElementById('impact-report-card')
+      if (!element) return
+      
+      const canvas = await html2canvas(element, { 
+        scale: 2, 
+        useCORS: true,
+        scrollY: 0, // স্ক্রল পজিশন ফিক্স
+        backgroundColor: '#ffffff'
+      })
+      
       canvas.toBlob(async (blob) => {
         if (blob) {
           try {
-              const item = new ClipboardItem({ 'image/png': blob })
-              await navigator.clipboard.write([item])
-              alert('✅ Report copied to clipboard! You can now paste it anywhere.')
+            const item = new ClipboardItem({ 'image/png': blob })
+            await navigator.clipboard.write([item])
+            alert('✅ Report copied to clipboard! You can now paste it anywhere.')
           } catch(err) {
-              alert('Failed to copy to clipboard. Your browser might not support this feature.')
+            alert('Failed to copy. Your browser might block clipboard access.')
           }
         }
       })
