@@ -5,7 +5,11 @@ import Link from 'next/link'
 import Image from 'next/image'
 import PrintButton from './PrintButton'
 
-export default async function ImpactReportPage() {
+export default async function ImpactReportPage({
+  searchParams
+}: {
+  searchParams: { from?: string, to?: string }
+}) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -15,19 +19,29 @@ export default async function ImpactReportPage() {
 
   const supabaseAdmin = createAdminClient()
   
-  // Last 7 days data
+  // 📅 Default Date Logic: Last Week (Saturday to Friday)
   const today = new Date()
-  const dayOfWeek = today.getDay()
-  const daysSinceSaturday = (dayOfWeek + 1) % 7
+  let defaultTo = new Date(today)
   
-  const lastSaturday = new Date(today)
-  lastSaturday.setDate(today.getDate() - daysSinceSaturday - (daysSinceSaturday === 0 && dayOfWeek !== 6 ? 7 : 0))
-  lastSaturday.setHours(0, 0, 0, 0)
+  // Step back to the most recent Friday
+  while (defaultTo.getDay() !== 5) {
+    defaultTo.setDate(defaultTo.getDate() - 1)
+  }
+  
+  // From date is 6 days before the recent Friday (which makes it Saturday)
+  let defaultFrom = new Date(defaultTo)
+  defaultFrom.setDate(defaultTo.getDate() - 6)
 
-  const thisFriday = new Date(lastSaturday)
-  thisFriday.setDate(lastSaturday.getDate() + 6)
-  thisFriday.setHours(23, 59, 59, 999)
+  const fromParam = searchParams.from
+  const toParam = searchParams.to
 
+  const fromDate = fromParam ? new Date(fromParam) : defaultFrom
+  const toDate = toParam ? new Date(toParam) : defaultTo
+
+  fromDate.setHours(0, 0, 0, 0)
+  toDate.setHours(23, 59, 59, 999)
+
+  // Fetch Reports based on Date
   const { data: reports } = await supabaseAdmin
     .from('evaluation_attempts')
     .select(`
@@ -35,8 +49,8 @@ export default async function ImpactReportPage() {
       evaluations!inner(title, created_by), 
       qa:profiles!evaluation_attempts_qa_id_fkey(full_name)
     `)
-    .gte('created_at', lastSaturday.toISOString())
-    .lte('created_at', thisFriday.toISOString())
+    .gte('created_at', fromDate.toISOString())
+    .lte('created_at', toDate.toISOString())
 
   const { data: profiles } = await supabaseAdmin.from('profiles').select('id, full_name')
   const profileMap = profiles?.reduce((acc: any, p: any) => ({ ...acc, [p.id]: p.full_name || 'Admin' }), {}) || {}
@@ -66,19 +80,24 @@ export default async function ImpactReportPage() {
     avgScore: qa.review > 0 ? Math.round(qa.score / qa.review) : 0
   }))
 
-  const dateStr = `${lastSaturday.toLocaleDateString('en-GB', {day: 'numeric', month: 'short'})} - ${thisFriday.toLocaleDateString('en-GB', {day: 'numeric', month: 'short'})}`
+  const dateStr = `${fromDate.toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'})} - ${toDate.toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'})}`
+  
+  // Format for input fields
+  const fromInputStr = fromDate.toISOString().split('T')[0]
+  const toInputStr = toDate.toISOString().split('T')[0]
 
   return (
     <div className="min-h-screen bg-gray-50 py-10 flex justify-center">
+      
+      {/* 📸 Picture Format Card */}
       <div id="impact-report-card" className="bg-white w-full max-w-md rounded-3xl shadow-xl overflow-hidden border border-gray-100 relative">
         
         <div className="text-center pt-8 pb-6 px-6">
           <div className="flex justify-center items-center gap-2 mb-2">
              <Image src="/logo.png" alt="Shikho" width={100} height={35} className="object-contain" />
-             <span className="text-xl font-bold text-gray-800">Intelligence</span>
           </div>
-          <p className="text-sm font-bold text-gray-500 bg-gray-100 inline-block px-4 py-1 rounded-full uppercase tracking-widest mt-2">
-            Trials - QA Weekly
+          <p className="text-lg font-black text-shikho-magenta-600 uppercase tracking-widest mt-2">
+            QA EVAL. REPORT
           </p>
           <p className="text-xs text-gray-400 mt-2 font-medium">{dateStr}</p>
         </div>
@@ -128,24 +147,49 @@ export default async function ImpactReportPage() {
             
             {qaReportArray.length === 0 && (
               <div className="px-6 py-8 text-center text-sm text-gray-400 font-medium">
-                No data available for this week.
+                No data available for selected dates.
               </div>
             )}
           </div>
         </div>
 
         <div className="text-center py-4 bg-gray-50 border-t border-gray-100">
-          <p className="text-[10px] text-gray-400 font-medium uppercase tracking-widest">Confidential • Internal Use Only</p>
+          <p className="text-[10px] text-gray-400 font-medium uppercase tracking-widest">Confidential • Management Report</p>
         </div>
       </div>
 
-      {/* print:hidden add kora hoyeche jate ei button gulo picture-e na ashe */}
-      <div className="fixed top-6 left-6 flex flex-col gap-4 print:hidden">
-        <Link href="/super-admin/dashboard" className="bg-gray-900 text-white px-5 py-2.5 rounded-full text-sm font-bold shadow-lg hover:bg-gray-800 transition-transform hover:scale-105">
+      {/* ⚙️ Control Panel (Hidden during Print/Screenshot) */}
+      <div className="fixed top-6 left-6 flex flex-col gap-4 print:hidden w-64">
+        <Link href="/super-admin/dashboard" className="bg-gray-900 text-white px-5 py-2.5 rounded-full text-center text-sm font-bold shadow-lg hover:bg-gray-800 transition-transform hover:scale-105">
           &larr; Back to Dashboard
         </Link>
+        
+        {/* Date Filter Panel */}
+        <div className="bg-white p-5 rounded-2xl shadow-lg border border-gray-100">
+          <p className="text-xs font-bold text-gray-600 mb-4 uppercase tracking-wider">Report Filter</p>
+          <form method="GET" className="flex flex-col gap-3">
+            <div>
+              <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">From Date</label>
+              <input type="date" name="from" defaultValue={fromInputStr} className="w-full px-3 py-2 border rounded-lg text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-shikho-magenta-500" />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">To Date</label>
+              <input type="date" name="to" defaultValue={toInputStr} className="w-full px-3 py-2 border rounded-lg text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-shikho-magenta-500" />
+            </div>
+            <button type="submit" className="w-full bg-shikho-indigo-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-shikho-indigo-700 mt-2">
+              Generate Report
+            </button>
+            {(fromParam || toParam) && (
+              <Link href="/super-admin/impact-report" className="text-center text-[10px] font-bold text-red-500 hover:underline pt-2">
+                Reset to Last Week
+              </Link>
+            )}
+          </form>
+        </div>
+
         <PrintButton />
       </div>
+
     </div>
   )
 }
