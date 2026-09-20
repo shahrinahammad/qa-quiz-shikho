@@ -1,98 +1,177 @@
-'use server'
-
-import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
-import { revalidatePath } from 'next/cache'
-import { sendPushNotification } from '@/app/actions/notification'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { createEvaluation } from './actions'
+import { redirect } from 'next/navigation'
 
-export async function createEvaluation(formData: FormData): Promise<void> {
-  const supabaseAdmin = createAdminClient()
+export default async function EvaluationsPage({
+  searchParams
+}: {
+  searchParams: { error?: string, success?: string }
+}) {
   const supabase = createClient()
-  
-  // ১. ফর্মের বদলে সরাসরি সার্ভার থেকে ইউজারের আইডি নিচ্ছি
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    console.error('User not authenticated')
-    return
-  }
-
-  const title = formData.get('title') as string
-  const duration = parseInt(formData.get('duration') as string)
-  const passingScore = parseInt(formData.get('passing_score') as string)
-  const agentId = formData.get('agent_id') as string
   
-  // ২. Question ডাটা পার্সিং ফিক্স (JSON বা Checkbox Array দুটোই সাপোর্ট করবে)
-  const questionsData = formData.getAll('questions')
-  let questions: string[] = []
+  if (!user) redirect('/login')
+
+  const supabaseAdmin = createAdminClient()
   
-  if (questionsData.length === 1 && typeof questionsData[0] === 'string') {
-    try {
-      questions = questionsData[0] ? JSON.parse(questionsData[0]) : []
-    } catch(e) {
-      questions = []
-    }
-  } else {
-    questions = questionsData as string[]
-  }
+  // অ্যাডমিন চাবি দিয়ে এজেন্টদের লিস্ট আনা
+  const { data: agents } = await supabaseAdmin
+    .from('profiles')
+    .select('id, email, full_name')
+    .eq('role', 'agent')
 
-  if (!title || !duration || !passingScore || !agentId || questions.length === 0) {
-    console.error('Validation failed: Missing required fields')
-    return
-  }
+  // অ্যাডমিন চাবি দিয়ে কোয়েশ্চেন ব্যাংক থেকে সব প্রশ্ন আনা
+  const { data: questions } = await supabaseAdmin
+    .from('questions')
+    .select('*')
+    .order('created_at', { ascending: false })
 
-  try {
-    // ৩. ইনসার্ট ডাটাবেস
-    const { data: evalData, error: evalError } = await supabaseAdmin
-      .from('evaluations')
-      .insert({
-        title,
-        duration_minutes: duration,
-        passing_score: passingScore,
-        created_by: user.id // সরাসরি সার্ভারের সিকিউর আইডি
-      })
-      .select()
-      .single()
+  // তৈরি করা ইভালুয়েশনগুলো আনা
+  const { data: evaluations } = await supabaseAdmin
+    .from('evaluations')
+    .select('*')
+    .order('created_at', { ascending: false })
 
-    if (evalError) throw evalError
+  return (
+    <div className="min-h-screen bg-shikho-canvas p-8">
+      <div className="max-w-7xl mx-auto space-y-8">
+        
+        <header className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+          <div>
+            <h1 className="text-2xl font-bold text-shikho-indigo-600 font-poppins">Evaluation Builder</h1>
+            <p className="text-gray-500 font-poppins text-sm mt-1">Create exams, select questions, and assign them to agents.</p>
+          </div>
+        </header>
 
-    const questionsToInsert = questions.map((qId: string) => ({
-      evaluation_id: evalData.id,
-      question_id: qId
-    }))
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          
+          {/* Create Evaluation Form */}
+          <div className="lg:col-span-1 bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-fit">
+            <h2 className="text-lg font-semibold text-gray-900 mb-6 font-poppins">Assign New Evaluation</h2>
+            
+            {searchParams.success && (
+              <div className="mb-4 p-3 bg-green-50 text-green-700 text-sm rounded-lg border border-green-200 break-words">
+                {searchParams.success}
+              </div>
+            )}
+            
+            {searchParams.error && (
+              <div className="mb-4 p-3 bg-red-50 text-shikho-coral-500 text-sm rounded-lg border border-red-200 break-words">
+                {searchParams.error}
+              </div>
+            )}
 
-    const { error: eqError } = await supabaseAdmin
-      .from('evaluation_questions')
-      .insert(questionsToInsert)
+            <form action={createEvaluation} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1 font-poppins">Evaluation Title</label>
+                <input type="text" name="title" required className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-shikho-indigo-500 text-sm font-poppins" placeholder="e.g. CRM Final Test Q3" />
+              </div>
 
-    if (eqError) throw eqError
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1 font-poppins">Description / Instructions</label>
+                <textarea name="description" rows={2} className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-shikho-indigo-500 text-sm font-poppins" placeholder="Special instructions for the agent..."></textarea>
+              </div>
 
-    const { error: attemptError } = await supabaseAdmin
-      .from('evaluation_attempts')
-      .insert({
-        evaluation_id: evalData.id,
-        agent_id: agentId,
-        qa_id: user.id,
-        status: 'ASSIGNED'
-      })
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1 font-poppins">Duration (Mins)</label>
+                  <input type="number" name="duration_minutes" required defaultValue="30" min="1" className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-shikho-indigo-500 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1 font-poppins">Pass Score (%)</label>
+                  <input type="number" name="passing_score" required defaultValue="80" min="1" max="100" className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-shikho-indigo-500 text-sm" />
+                </div>
+              </div>
 
-    if (attemptError) throw attemptError
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1 font-poppins">Assign to Agent</label>
+                <select name="agent_id" required className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-shikho-indigo-500 text-sm bg-white font-poppins">
+                  <option value="">Select an Agent...</option>
+                  {agents?.map(agent => (
+                    <option key={agent.id} value={agent.id}>
+                      {agent.full_name || agent.email}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-    // ৪. পুশ নোটিফিকেশন পাঠানো (Try-Catch এর ভেতরে যাতে এরর আসলেও ডাটা সেভ হয়)
-    try {
-      await sendPushNotification(
-        agentId, 
-        'New Exam Assigned 📝', 
-        `QA has assigned a new exam (${title}) for you. Please check your dashboard.`
-      )
-    } catch (notifyError) {
-      console.error('Notification failed but exam assigned:', notifyError)
-    }
+              {/* প্রশ্ন সিলেক্ট করার অপশন (Question Selection) */}
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2 font-poppins">Select Questions</label>
+                <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-2 space-y-2 bg-gray-50">
+                  {questions?.length === 0 ? (
+                    <p className="text-xs text-gray-500 p-2 font-poppins">No questions available. Add questions to the bank first.</p>
+                  ) : (
+                    questions?.map(q => (
+                      <label key={q.id} className="flex items-start gap-3 p-2 bg-white rounded cursor-pointer border border-transparent hover:border-shikho-indigo-300 transition-colors shadow-sm">
+                        {/* 🛠️ FIXED: name="question_ids" theke name="questions" kora hoyeche */}
+                        <input type="checkbox" name="questions" value={q.id} className="mt-1 accent-shikho-indigo-600" />
+                        <div>
+                          <p className="text-xs font-bold text-gray-800 font-poppins">
+                            {q.question_id} <span className="text-gray-400 font-normal">({q.marks} Marks)</span>
+                          </p>
+                          <p className="text-xs text-gray-600 line-clamp-1 font-bengali mt-0.5">{q.content}</p>
+                        </div>
+                      </label>
+                    ))
+                  )}
+                </div>
+              </div>
 
-    // ৫. পেজ রিফ্রেশ করে নতুন ডাটা দেখানো
-    revalidatePath('/super-admin/evaluations')
-    revalidatePath('/qa/dashboard')
-    
-  } catch (err: any) {
-    console.error('Database Error:', err.message)
-  }
+              <button type="submit" className="w-full bg-shikho-indigo-600 text-white py-2.5 rounded-lg font-poppins font-medium hover:bg-shikho-indigo-700 transition-colors mt-4">
+                Create & Assign
+              </button>
+            </form>
+          </div>
+
+          {/* Evaluations List Table */}
+          <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="p-6 border-b border-gray-100">
+              <h2 className="text-lg font-semibold text-gray-900 font-poppins">Active Evaluations</h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-shikho-indigo-50 text-gray-600 text-xs uppercase tracking-wider font-poppins">
+                    <th className="px-6 py-4 font-medium">Evaluation ID</th>
+                    <th className="px-6 py-4 font-medium">Title</th>
+                    <th className="px-6 py-4 font-medium">Questions</th>
+                    <th className="px-6 py-4 font-medium">Duration</th>
+                    <th className="px-6 py-4 font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {evaluations?.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-8 text-center text-gray-500 text-sm font-poppins">
+                        No evaluations created yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    evaluations?.map((ev) => (
+                      <tr key={ev.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-6 py-4 text-sm font-medium text-gray-900 font-poppins">{ev.evaluation_id}</td>
+                        <td className="px-6 py-4 text-sm text-gray-700 font-poppins font-medium">{ev.title}</td>
+                        <td className="px-6 py-4 text-sm text-gray-500 font-poppins">
+                          {ev.question_ids?.length || 0} Qs
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-500 font-poppins">{ev.duration_minutes} mins</td>
+                        <td className="px-6 py-4">
+                           <span className="px-3 py-1 rounded-full text-xs font-medium font-poppins bg-shikho-sunrise-500/10 text-shikho-sunrise-500">
+                             {ev.status}
+                           </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  )
 }
