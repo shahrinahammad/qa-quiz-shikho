@@ -18,20 +18,14 @@ export default async function ImpactReportPage({
 
   const supabaseAdmin = createAdminClient()
   
-  const today = new Date()
-  let defaultTo = new Date(today)
-  while (defaultTo.getDay() !== 5) {
-    defaultTo.setDate(defaultTo.getDate() - 1)
-  }
+  // 1. Default to Today's Date (Bangladesh Time) setup kora hoyeche
+  const todayDate = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Dhaka' }) // YYYY-MM-DD format
   
-  let defaultFrom = new Date(defaultTo)
-  defaultFrom.setDate(defaultTo.getDate() - 6)
+  const fromParam = searchParams.from !== undefined ? searchParams.from : todayDate
+  const toParam = searchParams.to !== undefined ? searchParams.to : todayDate
 
-  const fromParam = searchParams.from
-  const toParam = searchParams.to
-
-  const fromDate = fromParam ? new Date(fromParam) : defaultFrom
-  const toDate = toParam ? new Date(toParam) : defaultTo
+  const fromDate = new Date(fromParam)
+  const toDate = new Date(toParam)
 
   fromDate.setHours(0, 0, 0, 0)
   toDate.setHours(23, 59, 59, 999)
@@ -71,9 +65,6 @@ export default async function ImpactReportPage({
   }))
 
   const dateStr = `${fromDate.toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'})} - ${toDate.toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'})}`
-  
-  const fromInputStr = fromDate.toISOString().split('T')[0]
-  const toInputStr = toDate.toISOString().split('T')[0]
 
   return (
     <div className="min-h-screen bg-gray-50 py-10 flex justify-center">
@@ -82,7 +73,6 @@ export default async function ImpactReportPage({
         
         <div className="text-center pt-8 pb-6 px-6">
           <div className="flex justify-center items-center gap-2 mb-2">
-             {/* 🛠️ লোগোর সাইজ h-8 থেকে h-14 করা হয়েছে এবং ইনলাইন স্টাইল যোগ করা হয়েছে */}
              <img src="/logo.png" alt="Shikho" className="h-14 w-auto object-contain mx-auto" style={{ height: '56px' }} crossOrigin="anonymous" />
           </div>
           <p className="text-lg font-black text-shikho-magenta-600 uppercase tracking-widest mt-2 leading-relaxed">
@@ -157,20 +147,18 @@ export default async function ImpactReportPage({
           <form method="GET" className="flex flex-col gap-3">
             <div>
               <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">From Date</label>
-              <input type="date" name="from" defaultValue={fromInputStr} className="w-full px-3 py-2 border rounded-lg text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-shikho-magenta-500" />
+              <input type="date" name="from" defaultValue={fromParam} className="w-full px-3 py-2 border rounded-lg text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-shikho-magenta-500" />
             </div>
             <div>
               <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">To Date</label>
-              <input type="date" name="to" defaultValue={toInputStr} className="w-full px-3 py-2 border rounded-lg text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-shikho-magenta-500" />
+              <input type="date" name="to" defaultValue={toParam} className="w-full px-3 py-2 border rounded-lg text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-shikho-magenta-500" />
             </div>
             <button type="submit" className="w-full bg-shikho-indigo-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-shikho-indigo-700 mt-2">
               Generate Report
             </button>
-            {(fromParam || toParam) && (
-              <Link href="/super-admin/impact-report" className="text-center text-[10px] font-bold text-red-500 hover:underline pt-2">
-                Reset to Last Week
-              </Link>
-            )}
+            <Link href="/super-admin/impact-report" className="text-center text-[10px] font-bold text-red-500 hover:underline pt-2">
+              Reset Date
+            </Link>
           </form>
         </div>
 
