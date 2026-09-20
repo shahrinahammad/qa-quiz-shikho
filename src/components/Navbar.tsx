@@ -29,33 +29,32 @@ export default async function Navbar() {
           <div className="hidden md:flex gap-6 text-sm font-medium text-gray-600">
             {role === 'super_admin' && (
               <>
-                <Link href="/super-admin/dashboard" className="hover:text-shikho-indigo-600">Dashboard</Link>
-                <Link href="/super-admin/users" className="hover:text-shikho-indigo-600">Users</Link>
-                <Link href="/super-admin/question-bank" className="hover:text-shikho-indigo-600">Question Bank</Link>
-                <Link href="/super-admin/evaluations" className="hover:text-shikho-indigo-600">Evaluations</Link>
-                <Link href="/qa/dashboard" className="hover:text-shikho-magenta-500">Review Queue</Link>
-                <Link href="/agent/dashboard" className="hover:text-shikho-sunrise-500">Agent View</Link>
+                <Link href="/super-admin/dashboard" className="hover:text-shikho-indigo-600 transition-colors">Dashboard</Link>
+                <Link href="/super-admin/users" className="hover:text-shikho-indigo-600 transition-colors">Users</Link>
+                <Link href="/super-admin/question-bank" className="hover:text-shikho-indigo-600 transition-colors">Question Bank</Link>
+                <Link href="/super-admin/evaluations" className="hover:text-shikho-indigo-600 transition-colors">Evaluations</Link>
+                <Link href="/qa/dashboard" className="hover:text-shikho-magenta-500 transition-colors">Review Queue</Link>
+                <Link href="/agent/dashboard" className="hover:text-shikho-sunrise-500 transition-colors">Agent View</Link>
               </>
             )}
             {role === 'qa' && (
               <>
-                <Link href="/qa/dashboard" className="hover:text-shikho-indigo-600">Dashboard</Link>
-                {/* QA-এর জন্য নতুন লিংক */}
-                <Link href="/qa/users" className="hover:text-shikho-indigo-600">Agent Management</Link>
-                <Link href="/super-admin/question-bank" className="hover:text-shikho-indigo-600">Question Bank</Link>
-                <Link href="/super-admin/evaluations" className="hover:text-shikho-indigo-600">Evaluations</Link>
+                <Link href="/qa/dashboard" className="hover:text-shikho-magenta-500 transition-colors">Dashboard</Link>
+                <Link href="/qa/users" className="hover:text-shikho-magenta-500 transition-colors">Agent Management</Link>
+                <Link href="/super-admin/question-bank" className="hover:text-shikho-indigo-600 transition-colors">Question Bank</Link>
+                <Link href="/super-admin/evaluations" className="hover:text-shikho-indigo-600 transition-colors">Evaluations</Link>
               </>
             )}
             {role === 'agent' && (
               <>
-                <Link href="/agent/dashboard" className="hover:text-shikho-indigo-600">My Evaluations</Link>
+                <Link href="/agent/dashboard" className="hover:text-shikho-indigo-600 transition-colors">My Evaluations</Link>
               </>
             )}
           </div>
         </div>
 
         <div className="flex items-center gap-4">
-          <span className="text-xs font-semibold text-gray-700 bg-gray-100 px-3 py-1.5 rounded-full uppercase tracking-wider">
+          <span className="text-xs font-semibold text-gray-700 bg-gray-100 px-3 py-1.5 rounded-full uppercase tracking-wider hidden sm:block">
             {role.replace('_', ' ')}
           </span>
           <form action={async () => {
@@ -64,7 +63,7 @@ export default async function Navbar() {
             await supabaseAuth.auth.signOut()
             redirect('/login')
           }}>
-            <button type="submit" className="text-sm font-medium text-shikho-coral-500 hover:text-red-600">
+            <button type="submit" className="text-sm font-bold text-shikho-coral-500 hover:text-red-600 transition-colors">
               Sign Out
             </button>
           </form>
