@@ -1,37 +1,54 @@
 'use server'
 
 import { createAdminClient } from '@/lib/supabase/admin'
+import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { sendPushNotification } from '@/app/actions/notification'
 
 export async function createEvaluation(formData: FormData): Promise<void> {
   const supabaseAdmin = createAdminClient()
+  const supabase = createClient()
+  
+  // ১. ফর্মের বদলে সরাসরি সার্ভার থেকে ইউজারের আইডি নিচ্ছি
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    console.error('User not authenticated')
+    return
+  }
+
   const title = formData.get('title') as string
   const duration = parseInt(formData.get('duration') as string)
   const passingScore = parseInt(formData.get('passing_score') as string)
   const agentId = formData.get('agent_id') as string
-  const questionsJson = formData.get('questions') as string
-  const createdBy = formData.get('created_by') as string
-
-  if (!title || !duration || !passingScore || !agentId || !questionsJson || !createdBy) {
-    console.error('All fields are required.')
-    return
+  
+  // ২. Question ডাটা পার্সিং ফিক্স (JSON বা Checkbox Array দুটোই সাপোর্ট করবে)
+  const questionsData = formData.getAll('questions')
+  let questions: string[] = []
+  
+  if (questionsData.length === 1 && typeof questionsData[0] === 'string') {
+    try {
+      questions = questionsData[0] ? JSON.parse(questionsData[0]) : []
+    } catch(e) {
+      questions = []
+    }
+  } else {
+    questions = questionsData as string[]
   }
 
-  const questions = JSON.parse(questionsJson)
-  if (!questions || questions.length === 0) {
-    console.error('Please select at least one question.')
+  if (!title || !duration || !passingScore || !agentId || questions.length === 0) {
+    console.error('Validation failed: Missing required fields')
     return
   }
 
   try {
+    // ৩. ইনসার্ট ডাটাবেস
     const { data: evalData, error: evalError } = await supabaseAdmin
       .from('evaluations')
       .insert({
         title,
         duration_minutes: duration,
         passing_score: passingScore,
-        created_by: createdBy
+        created_by: user.id // সরাসরি সার্ভারের সিকিউর আইডি
       })
       .select()
       .single()
@@ -54,21 +71,28 @@ export async function createEvaluation(formData: FormData): Promise<void> {
       .insert({
         evaluation_id: evalData.id,
         agent_id: agentId,
-        qa_id: createdBy,
+        qa_id: user.id,
         status: 'ASSIGNED'
       })
 
     if (attemptError) throw attemptError
 
-    // 🔔 Send Push Notification to Agent
-    await sendPushNotification(
-      agentId, 
-      'New Exam Assigned 📝', 
-      `QA has assigned a new exam (${title}) for you. Please check your dashboard.`
-    )
+    // ৪. পুশ নোটিফিকেশন পাঠানো (Try-Catch এর ভেতরে যাতে এরর আসলেও ডাটা সেভ হয়)
+    try {
+      await sendPushNotification(
+        agentId, 
+        'New Exam Assigned 📝', 
+        `QA has assigned a new exam (${title}) for you. Please check your dashboard.`
+      )
+    } catch (notifyError) {
+      console.error('Notification failed but exam assigned:', notifyError)
+    }
 
+    // ৫. পেজ রিফ্রেশ করে নতুন ডাটা দেখানো
     revalidatePath('/super-admin/evaluations')
+    revalidatePath('/qa/dashboard')
+    
   } catch (err: any) {
-    console.error('Failed to assign evaluation:', err.message)
+    console.error('Database Error:', err.message)
   }
 }
