@@ -2,7 +2,6 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import Image from 'next/image'
 import PrintButton from './PrintButton'
 
 export default async function ImpactReportPage({
@@ -19,16 +18,12 @@ export default async function ImpactReportPage({
 
   const supabaseAdmin = createAdminClient()
   
-  // 📅 Default Date Logic: Last Week (Saturday to Friday)
   const today = new Date()
   let defaultTo = new Date(today)
-  
-  // Step back to the most recent Friday
   while (defaultTo.getDay() !== 5) {
     defaultTo.setDate(defaultTo.getDate() - 1)
   }
   
-  // From date is 6 days before the recent Friday (which makes it Saturday)
   let defaultFrom = new Date(defaultTo)
   defaultFrom.setDate(defaultTo.getDate() - 6)
 
@@ -41,14 +36,9 @@ export default async function ImpactReportPage({
   fromDate.setHours(0, 0, 0, 0)
   toDate.setHours(23, 59, 59, 999)
 
-  // Fetch Reports based on Date
   const { data: reports } = await supabaseAdmin
     .from('evaluation_attempts')
-    .select(`
-      *, 
-      evaluations!inner(title, created_by), 
-      qa:profiles!evaluation_attempts_qa_id_fkey(full_name)
-    `)
+    .select(`*, evaluations!inner(title, created_by), qa:profiles!evaluation_attempts_qa_id_fkey(full_name)`)
     .gte('created_at', fromDate.toISOString())
     .lte('created_at', toDate.toISOString())
 
@@ -82,21 +72,20 @@ export default async function ImpactReportPage({
 
   const dateStr = `${fromDate.toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'})} - ${toDate.toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'})}`
   
-  // Format for input fields
   const fromInputStr = fromDate.toISOString().split('T')[0]
   const toInputStr = toDate.toISOString().split('T')[0]
 
   return (
     <div className="min-h-screen bg-gray-50 py-10 flex justify-center">
       
-      {/* 📸 Picture Format Card */}
       <div id="impact-report-card" className="bg-white w-full max-w-md rounded-3xl shadow-xl overflow-hidden border border-gray-100 relative">
         
         <div className="text-center pt-8 pb-6 px-6">
           <div className="flex justify-center items-center gap-2 mb-2">
-             <Image src="/logo.png" alt="Shikho" width={100} height={35} className="object-contain" />
+             {/* 🛠️ Next.js Image-এর বদলে স্ট্যান্ডার্ড img ট্যাগ ব্যবহার করা হলো */}
+             <img src="/logo.png" alt="Shikho" className="h-8 object-contain mx-auto" crossOrigin="anonymous" />
           </div>
-          <p className="text-lg font-black text-shikho-magenta-600 uppercase tracking-widest mt-2">
+          <p className="text-lg font-black text-shikho-magenta-600 uppercase tracking-widest mt-2 leading-relaxed">
             QA EVAL. REPORT
           </p>
           <p className="text-xs text-gray-400 mt-2 font-medium">{dateStr}</p>
@@ -105,22 +94,22 @@ export default async function ImpactReportPage({
         <div className="flex justify-between px-6 pb-6 border-b border-gray-100">
           <div className="text-center">
             <p className="text-[10px] font-bold text-shikho-indigo-600 uppercase tracking-wider mb-1">Assigned</p>
-            <p className="text-3xl font-black text-gray-800">{assigned}</p>
+            <p className="text-3xl font-black text-gray-800 leading-none">{assigned}</p>
           </div>
           <div className="w-px bg-gray-200"></div>
           <div className="text-center">
             <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider mb-1">Submitted</p>
-            <p className="text-3xl font-black text-blue-900">{submitted}</p>
+            <p className="text-3xl font-black text-blue-900 leading-none">{submitted}</p>
           </div>
           <div className="w-px bg-gray-200"></div>
           <div className="text-center">
             <p className="text-[10px] font-bold text-green-600 uppercase tracking-wider mb-1">Reviewed</p>
-            <p className="text-3xl font-black text-green-700">{reviewed}</p>
+            <p className="text-3xl font-black text-green-700 leading-none">{reviewed}</p>
           </div>
         </div>
 
         <div className="bg-shikho-magenta-50/30 p-2">
-          <div className="bg-shikho-magenta-100 text-shikho-magenta-700 text-[10px] font-bold uppercase flex justify-between px-6 py-2 rounded-t-xl tracking-wider">
+          <div className="bg-shikho-magenta-100 text-shikho-magenta-700 text-[10px] font-bold uppercase flex justify-between px-6 py-3 rounded-t-xl tracking-wider">
             <span className="w-1/2">QA TEAM</span>
             <span className="w-1/4 text-center">DONE</span>
             <span className="w-1/4 text-right">AVG. SCORE</span>
@@ -128,17 +117,18 @@ export default async function ImpactReportPage({
           
           <div className="bg-white">
             {qaReportArray.map((qa, i) => (
-              <div key={i} className="flex justify-between items-center px-6 py-4 border-b border-gray-50 hover:bg-gray-50 transition-colors">
+              <div key={i} className="flex justify-between items-center px-6 py-4 border-b border-gray-50">
                 <div className="w-1/2 flex items-center gap-3">
-                  <span className="text-gray-400 text-xs">{(i + 1).toString().padStart(2, '0')}</span>
-                  <span className="text-sm font-bold text-gray-800 line-clamp-1">{qa.name}</span>
+                  <span className="text-gray-400 text-xs mt-0.5">{(i + 1).toString().padStart(2, '0')}</span>
+                  {/* 🛠️ line-clamp রিমুভ করে truncate ও padding দেওয়া হয়েছে */}
+                  <span className="text-sm font-bold text-gray-800 truncate block py-1">{qa.name}</span>
                 </div>
                 <div className="w-1/4 text-center">
                   <span className="text-sm font-bold text-blue-600">{qa.review}</span>
                   <span className="text-[10px] text-gray-400 ml-1">/{qa.assign}</span>
                 </div>
                 <div className="w-1/4 text-right">
-                  <span className={`text-sm font-bold px-2 py-1 rounded ${qa.avgScore >= 80 ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
+                  <span className={`text-sm font-bold px-2 py-1.5 rounded inline-block ${qa.avgScore >= 80 ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
                     {qa.avgScore}%
                   </span>
                 </div>
@@ -154,17 +144,15 @@ export default async function ImpactReportPage({
         </div>
 
         <div className="text-center py-4 bg-gray-50 border-t border-gray-100">
-          <p className="text-[10px] text-gray-400 font-medium uppercase tracking-widest">Confidential • Management Report</p>
+          <p className="text-[10px] text-gray-400 font-medium uppercase tracking-widest leading-relaxed">Confidential • Management Report</p>
         </div>
       </div>
 
-      {/* ⚙️ Control Panel (Hidden during Print/Screenshot) */}
       <div className="fixed top-6 left-6 flex flex-col gap-4 print:hidden w-64">
         <Link href="/super-admin/dashboard" className="bg-gray-900 text-white px-5 py-2.5 rounded-full text-center text-sm font-bold shadow-lg hover:bg-gray-800 transition-transform hover:scale-105">
           &larr; Back to Dashboard
         </Link>
         
-        {/* Date Filter Panel */}
         <div className="bg-white p-5 rounded-2xl shadow-lg border border-gray-100">
           <p className="text-xs font-bold text-gray-600 mb-4 uppercase tracking-wider">Report Filter</p>
           <form method="GET" className="flex flex-col gap-3">
