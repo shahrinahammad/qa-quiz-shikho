@@ -4,18 +4,24 @@ import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 
 export default function NotificationBell({ 
-  count, 
   notifications, 
   dashboardLink 
 }: { 
-  count: number, 
   notifications: any[], 
   dashboardLink: string 
 }) {
   const [isOpen, setIsOpen] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(notifications.length)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  // Click outside to close dropdown
+  useEffect(() => {
+    setUnreadCount(notifications.length)
+  }, [notifications])
+
+  const handleMarkAsRead = () => {
+    setUnreadCount(0)
+  }
+
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -34,26 +40,32 @@ export default function NotificationBell({
         title="Notifications"
       >
         <span className="text-xl">🔔</span>
-        {count > 0 && (
+        {unreadCount > 0 && (
           <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full border-2 border-white animate-pulse">
-            {count > 9 ? '9+' : count}
+            {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
       </button>
 
-      {/* Pop-up Dropdown Menu */}
       {isOpen && (
         <div className="absolute right-0 mt-3 w-80 bg-white border border-gray-100 rounded-2xl shadow-xl z-50 overflow-hidden transform transition-all">
           <div className="bg-gray-50 px-4 py-3 border-b border-gray-100 flex justify-between items-center">
             <h3 className="font-bold text-gray-800 text-sm font-poppins">Notifications</h3>
-            {count > 0 && <span className="bg-shikho-magenta-100 text-shikho-magenta-600 text-[10px] px-2 py-0.5 rounded-full font-bold">{count} New</span>}
+            {unreadCount > 0 && (
+              <button 
+                onClick={handleMarkAsRead}
+                className="text-xs text-shikho-indigo-600 font-bold hover:underline"
+              >
+                Mark all as read
+              </button>
+            )}
           </div>
           
           <div className="max-h-72 overflow-y-auto">
             {notifications.length > 0 ? (
               <div className="divide-y divide-gray-50">
                 {notifications.map((notif, idx) => (
-                  <div key={idx} className="p-4 hover:bg-gray-50 transition-colors">
+                  <div key={idx} className={`p-4 transition-colors ${idx < unreadCount ? 'bg-blue-50/30' : 'bg-white'}`}>
                     <p className="text-xs text-gray-800 leading-relaxed" dangerouslySetInnerHTML={{ __html: notif.text }}></p>
                     <p className="text-[10px] text-gray-400 mt-1">{notif.time}</p>
                   </div>
@@ -61,7 +73,7 @@ export default function NotificationBell({
               </div>
             ) : (
               <div className="p-6 text-center text-gray-400 text-xs">
-                📭 No new notifications
+                📭 No notifications
               </div>
             )}
           </div>
