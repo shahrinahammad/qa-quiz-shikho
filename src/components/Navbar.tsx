@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import PushNotificationManager from './PushNotificationManager'
+import NotificationBell from './NotificationBell'
 
 export default async function Navbar() {
   const supabase = createClient()
@@ -18,37 +19,50 @@ export default async function Navbar() {
     .single()
     
   const role = profile?.role || 'agent'
-
-  // 🔔 Notification Engine: Automatically calculates pending actions
   const supabaseAdmin = createAdminClient()
-  let notifCount = 0
   
-  // ডাইনামিক লিংক: যার যার ড্যাশবোর্ডে যাবে
-  const notifLink = `/${role === 'super_admin' ? 'super-admin' : role}/dashboard`
+  let notifCount = 0
+  let notificationsList: any[] = []
+  const dashboardLink = `/${role === 'super_admin' ? 'super-admin' : role}/dashboard`
 
+  // 🔔 Generate Notification Details based on Role
   if (role === 'agent') {
-    // Agent Notification: Assigned but not submitted yet
-    const { count } = await supabaseAdmin
+    const { data: pendingTasks } = await supabaseAdmin
       .from('evaluation_attempts')
-      .select('*', { count: 'exact', head: true })
+      .select('*, evaluations!inner(title), qa:profiles!evaluation_attempts_qa_id_fkey(full_name)')
       .eq('agent_id', user.id)
       .eq('status', 'ASSIGNED')
+      .order('created_at', { ascending: false })
+      .limit(10)
     
-    notifCount = count || 0
+    notifCount = pendingTasks?.length || 0
+    notificationsList = pendingTasks?.map(t => ({
+      text: `<strong>${t.qa?.full_name || 'QA'}</strong> assigned a new assessment to you: <span className="italic text-shikho-magenta-600">${t.evaluations?.title}</span>`,
+      time: new Date(t.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+    })) || []
+    
   } else {
-    // QA & Super Admin Notification: Exams waiting for review or recheck
+    // QA & Super Admin View
     let query = supabaseAdmin
       .from('evaluation_attempts')
-      .select('id, evaluations!inner(created_by)', { count: 'exact', head: true })
+      .select('*, evaluations!inner(title, created_by), agent:profiles!evaluation_attempts_agent_id_fkey(full_name)')
       .in('status', ['UNDER_QA_REVIEW', 'RECHECK_REQUESTED'])
+      .order('submitted_at', { ascending: false })
+      .limit(10)
 
-    // QA will only see notifications for exams they assigned
     if (role === 'qa') {
       query = query.eq('evaluations.created_by', user.id)
     }
 
-    const { count } = await query
-    notifCount = count || 0
+    const { data: qaTasks } = await query
+    
+    notifCount = qaTasks?.length || 0
+    notificationsList = qaTasks?.map(t => ({
+      text: t.status === 'RECHECK_REQUESTED' 
+        ? `⚠️ <strong>${t.agent?.full_name || 'Agent'}</strong> requested a recheck for <span className="italic text-orange-600">${t.evaluations?.title}</span>`
+        : `✅ <strong>${t.agent?.full_name || 'Agent'}</strong> submitted <span className="italic text-blue-600">${t.evaluations?.title}</span>`,
+      time: new Date(t.submitted_at || t.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+    })) || []
   }
 
   return (
@@ -59,7 +73,7 @@ export default async function Navbar() {
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           
           <div className="flex items-center gap-10">
-            <Link href={`/${role === 'super_admin' ? 'super-admin' : role}/dashboard`}>
+            <Link href={dashboardLink}>
               <Image src="/logo.png" alt="Shikho Logo" width={90} height={30} className="object-contain cursor-pointer" priority />
             </Link>
             
@@ -71,7 +85,6 @@ export default async function Navbar() {
                   <Link href="/super-admin/question-bank" className="hover:text-shikho-indigo-600 transition-colors">Question Bank</Link>
                   <Link href="/super-admin/evaluations" className="hover:text-shikho-indigo-600 transition-colors">Evaluations</Link>
                   <Link href="/qa/dashboard" className="hover:text-shikho-magenta-500 transition-colors">Review Queue</Link>
-                  <Link href="/agent/dashboard" className="hover:text-shikho-sunrise-500 transition-colors">Agent View</Link>
                 </>
               )}
               {role === 'qa' && (
@@ -83,24 +96,19 @@ export default async function Navbar() {
                 </>
               )}
               {role === 'agent' && (
-                <>
-                  <Link href="/agent/dashboard" className="hover:text-shikho-indigo-600 transition-colors">My Evaluations</Link>
-                </>
+                <Link href="/agent/dashboard" className="hover:text-shikho-indigo-600 transition-colors">My Evaluations</Link>
               )}
             </div>
           </div>
 
           <div className="flex items-center gap-5">
             
-            {/* 🔔 Dynamic Notification Bell */}
-            <Link href={notifLink} className="relative p-1.5 rounded-full hover:bg-gray-50 transition-colors cursor-pointer" title="Notifications">
-              <span className="text-xl">🔔</span>
-              {notifCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full border-2 border-white animate-pulse">
-                  {notifCount}
-                </span>
-              )}
-            </Link>
+            {/* 🔔 Client Component Bell Dropdown */}
+            <NotificationBell 
+              count={notifCount} 
+              notifications={notificationsList} 
+              dashboardLink={role === 'super_admin' ? '/qa/dashboard' : dashboardLink} 
+            />
 
             <span className="text-xs font-semibold text-gray-700 bg-gray-100 px-3 py-1.5 rounded-full uppercase tracking-wider hidden sm:block">
               {role.replace('_', ' ')}
