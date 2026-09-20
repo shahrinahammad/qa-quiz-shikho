@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { deleteEvaluationAttempt } from './actions'
+import { deleteEvaluationAttempt, sendIndividualReminder, sendBulkReminder } from './actions'
 
 export default async function SuperAdminDashboard({
   searchParams
@@ -168,7 +168,19 @@ export default async function SuperAdminDashboard({
         )}
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="p-6 border-b border-gray-100"><h2 className="text-lg font-semibold text-gray-900 font-poppins">Assignment & Review Tracking</h2></div>
+          <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <h2 className="text-lg font-semibold text-gray-900 font-poppins">Assignment & Review Tracking</h2>
+            
+            {/* 🔔 Bulk Reminder Button */}
+            <form action={async () => {
+              'use server'
+              await sendBulkReminder(profile?.role === 'super_admin' ? undefined : user.id)
+            }}>
+              <button type="submit" className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-xs font-bold transition-colors">
+                🔔 Remind All Pending
+              </button>
+            </form>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead className="bg-shikho-indigo-50 text-gray-600 text-xs uppercase font-poppins">
@@ -206,6 +218,18 @@ export default async function SuperAdminDashboard({
                     
                     <td className="px-6 py-4 text-right flex justify-end gap-2 items-center">
                       
+                      {/* 🔔 Individual Reminder Button */}
+                      {row.status === 'ASSIGNED' && (
+                        <form action={async () => {
+                          'use server'
+                          await sendIndividualReminder(row.agent_id, row.evaluations?.title)
+                        }}>
+                          <button type="submit" className="text-[10px] font-bold text-orange-600 bg-orange-50 px-3 py-1.5 rounded hover:bg-orange-100 transition-colors uppercase tracking-wider">
+                            🔔 Remind
+                          </button>
+                        </form>
+                      )}
+
                       {/* 🛠️ Dynamic Live View logic */}
                       <Link 
                         href={row.status === 'ASSIGNED' ? `/agent/evaluation/${row.attempt_id}` : row.status === 'UNDER_QA_REVIEW' ? `/qa/review/${row.attempt_id}` : `/agent/result/${row.attempt_id}`}
