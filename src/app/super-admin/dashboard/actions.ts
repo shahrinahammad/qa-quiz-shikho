@@ -51,7 +51,8 @@ export async function sendBulkReminder(qaId?: string) {
   const { data: pendingExams } = await query
 
   if (pendingExams) {
-    for (const exam of pendingExams) {
+    // 🛠️ FIXED: Added 'as any[]' here too
+    for (const exam of pendingExams as any[]) {
       try {
         await sendPushNotification(
           exam.agent_id,
