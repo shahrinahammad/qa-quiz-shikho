@@ -15,19 +15,19 @@ export default async function EvaluationsPage({
 
   const supabaseAdmin = createAdminClient()
   
-  // অ্যাডমিন চাবি দিয়ে এজেন্টদের লিস্ট আনা
+  // অ্যাডমিন চাবি দিয়ে এজেন্টদের লিস্ট আনা[cite: 14]
   const { data: agents } = await supabaseAdmin
     .from('profiles')
     .select('id, email, full_name')
     .eq('role', 'agent')
 
-  // অ্যাডমিন চাবি দিয়ে কোয়েশ্চেন ব্যাংক থেকে সব প্রশ্ন আনা
+  // অ্যাডমিন চাবি দিয়ে কোয়েশ্চেন ব্যাংক থেকে সব প্রশ্ন আনা[cite: 14]
   const { data: questions } = await supabaseAdmin
     .from('questions')
     .select('*')
     .order('created_at', { ascending: false })
 
-  // তৈরি করা ইভালুয়েশনগুলো আনা
+  // তৈরি করা ইভালুয়েশনগুলো আনা[cite: 14]
   const { data: evaluations } = await supabaseAdmin
     .from('evaluations')
     .select('*')
@@ -105,8 +105,7 @@ export default async function EvaluationsPage({
                   ) : (
                     questions?.map(q => (
                       <label key={q.id} className="flex items-start gap-3 p-2 bg-white rounded cursor-pointer border border-transparent hover:border-shikho-indigo-300 transition-colors shadow-sm">
-                        {/* 🛠️ FIXED: name="question_ids" theke name="questions" kora hoyeche */}
-                        <input type="checkbox" name="questions" value={q.id} className="mt-1 accent-shikho-indigo-600" />
+                        <input type="checkbox" name="question_ids" value={q.id} className="mt-1 accent-shikho-indigo-600" />
                         <div>
                           <p className="text-xs font-bold text-gray-800 font-poppins">
                             {q.question_id} <span className="text-gray-400 font-normal">({q.marks} Marks)</span>
