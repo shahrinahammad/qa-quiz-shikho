@@ -82,8 +82,8 @@ export default async function ImpactReportPage({
         
         <div className="text-center pt-8 pb-6 px-6">
           <div className="flex justify-center items-center gap-2 mb-2">
-             {/* 🛠️ Next.js Image-এর বদলে স্ট্যান্ডার্ড img ট্যাগ ব্যবহার করা হলো */}
-             <img src="/logo.png" alt="Shikho" className="h-8 object-contain mx-auto" crossOrigin="anonymous" />
+             {/* 🛠️ লোগোর সাইজ h-8 থেকে h-14 করা হয়েছে এবং ইনলাইন স্টাইল যোগ করা হয়েছে */}
+             <img src="/logo.png" alt="Shikho" className="h-14 w-auto object-contain mx-auto" style={{ height: '56px' }} crossOrigin="anonymous" />
           </div>
           <p className="text-lg font-black text-shikho-magenta-600 uppercase tracking-widest mt-2 leading-relaxed">
             QA EVAL. REPORT
@@ -120,7 +120,6 @@ export default async function ImpactReportPage({
               <div key={i} className="flex justify-between items-center px-6 py-4 border-b border-gray-50">
                 <div className="w-1/2 flex items-center gap-3">
                   <span className="text-gray-400 text-xs mt-0.5">{(i + 1).toString().padStart(2, '0')}</span>
-                  {/* 🛠️ line-clamp রিমুভ করে truncate ও padding দেওয়া হয়েছে */}
                   <span className="text-sm font-bold text-gray-800 truncate block py-1">{qa.name}</span>
                 </div>
                 <div className="w-1/4 text-center">
