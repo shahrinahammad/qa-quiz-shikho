@@ -25,8 +25,21 @@ export default async function Navbar() {
   let notificationsList: any[] = []
   const dashboardLink = `/${role === 'super_admin' ? 'super-admin' : role}/dashboard`
 
+  // 🕒 Helper function for Bangladesh Time
+  const formatBST = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-GB', { 
+      timeZone: 'Asia/Dhaka', 
+      day: 'numeric', 
+      month: 'short', 
+      hour: '2-digit', 
+      minute: '2-digit', 
+      hour12: true 
+    })
+  }
+
   // 🔔 Generate Notification Details based on Role
   if (role === 'agent') {
+    // 👤 Agent: Sees ONLY exams assigned to THEM
     const { data: pendingTasks } = await supabaseAdmin
       .from('evaluation_attempts')
       .select('*, evaluations!inner(title), qa:profiles!evaluation_attempts_qa_id_fkey(full_name)')
@@ -38,31 +51,45 @@ export default async function Navbar() {
     notifCount = pendingTasks?.length || 0
     notificationsList = pendingTasks?.map(t => ({
       text: `<strong>${t.qa?.full_name || 'QA'}</strong> assigned a new assessment to you: <span className="italic text-shikho-magenta-600">${t.evaluations?.title}</span>`,
-      time: new Date(t.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+      time: formatBST(t.created_at)
     })) || []
     
   } else {
-    // QA & Super Admin View
-    let query = supabaseAdmin
+    // 👑 Super Admin & QA: Sees ALL notifications (Assigned & Submitted)
+    
+    // 1. ALL Submitted/Recheck Exams
+    const { data: qaTasks } = await supabaseAdmin
       .from('evaluation_attempts')
       .select('*, evaluations!inner(title, created_by), agent:profiles!evaluation_attempts_agent_id_fkey(full_name)')
       .in('status', ['UNDER_QA_REVIEW', 'RECHECK_REQUESTED'])
       .order('submitted_at', { ascending: false })
       .limit(10)
 
-    if (role === 'qa') {
-      query = query.eq('evaluations.created_by', user.id)
-    }
+    // 2. ALL Assigned Exams
+    const { data: assignedTasks } = await supabaseAdmin
+      .from('evaluation_attempts')
+      .select('*, evaluations!inner(title), qa:profiles!evaluation_attempts_qa_id_fkey(full_name), agent:profiles!evaluation_attempts_agent_id_fkey(full_name)')
+      .eq('status', 'ASSIGNED')
+      .order('created_at', { ascending: false })
+      .limit(10)
 
-    const { data: qaTasks } = await query
+    const allNotifs = [
+      ...(qaTasks || []).map(t => ({
+        text: t.status === 'RECHECK_REQUESTED' 
+          ? `⚠️ <strong>${t.agent?.full_name || 'Agent'}</strong> requested a recheck for <span className="italic text-orange-600">${t.evaluations?.title}</span>`
+          : `✅ <strong>${t.agent?.full_name || 'Agent'}</strong> submitted <span className="italic text-blue-600">${t.evaluations?.title}</span>`,
+        timeStr: t.submitted_at || t.created_at,
+        time: formatBST(t.submitted_at || t.created_at)
+      })),
+      ...(assignedTasks || []).map(t => ({
+        text: `📝 <strong>${t.qa?.full_name || 'QA'}</strong> assigned <span className="italic text-shikho-magenta-600">${t.evaluations?.title}</span> to <strong>${t.agent?.full_name || 'Agent'}</strong>`,
+        timeStr: t.created_at,
+        time: formatBST(t.created_at)
+      }))
+    ].sort((a, b) => new Date(b.timeStr).getTime() - new Date(a.timeStr).getTime()).slice(0, 15) // Sort by newest, max 15
     
-    notifCount = qaTasks?.length || 0
-    notificationsList = qaTasks?.map(t => ({
-      text: t.status === 'RECHECK_REQUESTED' 
-        ? `⚠️ <strong>${t.agent?.full_name || 'Agent'}</strong> requested a recheck for <span className="italic text-orange-600">${t.evaluations?.title}</span>`
-        : `✅ <strong>${t.agent?.full_name || 'Agent'}</strong> submitted <span className="italic text-blue-600">${t.evaluations?.title}</span>`,
-      time: new Date(t.submitted_at || t.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-    })) || []
+    notifCount = allNotifs.length
+    notificationsList = allNotifs
   }
 
   return (
