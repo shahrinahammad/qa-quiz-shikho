@@ -17,13 +17,14 @@ export async function GET(request: Request) {
 
   let sentCount = 0
   
-  for (const item of pendingExams) {
-    const exam: any = item // 🛠️ Bulletproof TypeScript bypass
-    
-    // Supabase array ba object ja-i return koruk, amra title ber kore nibo
+  // 🛠️ TypeScript Error Bypass
+  const exams: any[] = pendingExams;
+
+  for (const exam of exams) {
+    // Array বা Object যাই হোক না কেন, টাইটেলটি নিরাপদে বের করে নিচ্ছি
     const examTitle = Array.isArray(exam.evaluations) 
       ? exam.evaluations[0]?.title 
-      : exam.evaluations?.title
+      : exam.evaluations?.title;
 
     if (examTitle) {
       try {
