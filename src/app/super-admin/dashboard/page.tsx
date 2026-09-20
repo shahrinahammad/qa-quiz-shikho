@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { deleteEvaluationAttempt } from './actions'
 
 export default async function SuperAdminDashboard({
   searchParams
@@ -39,13 +40,29 @@ export default async function SuperAdminDashboard({
   
   const { data: reports } = await query
   
-  // কে খাতা Assign করেছে তা বের করার জন্য সব ইউজারের লিস্ট আনা
   const { data: profiles } = await supabaseAdmin.from('profiles').select('id, full_name')
   const profileMap = profiles?.reduce((acc: any, p: any) => ({ ...acc, [p.id]: p.full_name || 'Admin' }), {}) || {}
 
   const total = reports?.length || 0
   const agentCompleted = reports?.filter(r => r.status !== 'ASSIGNED').length || 0
   const qaReviewed = reports?.filter(r => r.status === 'PUBLISHED').length || 0
+
+  // 📊 QA-wise Performance Report তৈরি করার লজিক
+  const qaPerformance: Record<string, any> = {}
+  reports?.forEach((r: any) => {
+    if (r.status === 'PUBLISHED' && r.qa_id && r.qa) {
+      if (!qaPerformance[r.qa_id]) {
+        qaPerformance[r.qa_id] = { name: r.qa.full_name, totalReviewed: 0, totalScore: 0 }
+      }
+      qaPerformance[r.qa_id].totalReviewed += 1
+      qaPerformance[r.qa_id].totalScore += (r.overall_score || 0)
+    }
+  })
+  
+  const qaReportArray = Object.values(qaPerformance).map(qa => ({
+    ...qa,
+    avgScore: Math.round(qa.totalScore / qa.totalReviewed)
+  }))
 
   return (
     <div className="min-h-screen bg-shikho-canvas p-8">
@@ -57,7 +74,6 @@ export default async function SuperAdminDashboard({
             <p className="text-gray-500 text-sm mt-1">Platform overview and date-wise tracking report.</p>
           </div>
           
-          {/* 📅 Date Filter Form */}
           <form method="GET" className="flex items-end gap-3 bg-gray-50 p-3 rounded-xl border border-gray-200">
             <div>
               <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">From Date</label>
@@ -67,9 +83,7 @@ export default async function SuperAdminDashboard({
               <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">To Date</label>
               <input type="date" name="to" defaultValue={to} className="px-3 py-1.5 border rounded-lg text-sm bg-white" />
             </div>
-            <button type="submit" className="bg-shikho-indigo-600 text-white px-4 py-1.5 rounded-lg text-sm font-bold hover:bg-shikho-indigo-700">
-              Filter
-            </button>
+            <button type="submit" className="bg-shikho-indigo-600 text-white px-4 py-1.5 rounded-lg text-sm font-bold hover:bg-shikho-indigo-700">Filter</button>
             {(from || to) && (
               <Link href="/super-admin/dashboard" className="text-xs font-bold text-red-500 hover:underline px-2">Clear</Link>
             )}
@@ -92,7 +106,36 @@ export default async function SuperAdminDashboard({
           </div>
         </div>
 
-        {/* Detailed Tracking Table */}
+        {/* 📊 NEW: QA Performance Report */}
+        {qaReportArray.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-sm border border-shikho-magenta-100 overflow-hidden">
+            <div className="p-6 border-b border-gray-100 bg-shikho-magenta-50/30">
+              <h2 className="text-lg font-semibold text-shikho-magenta-600 font-poppins">QA Performance Summary</h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-gray-50 text-gray-600 text-xs uppercase font-poppins">
+                  <tr>
+                    <th className="px-6 py-4">QA Name</th>
+                    <th className="px-6 py-4">Total Exams Reviewed</th>
+                    <th className="px-6 py-4">Average Score Given</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {qaReportArray.map((qa: any, idx: number) => (
+                    <tr key={idx} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 text-sm font-bold text-gray-900">{qa.name}</td>
+                      <td className="px-6 py-4 text-sm text-blue-600 font-bold">{qa.totalReviewed}</td>
+                      <td className="px-6 py-4 text-sm text-green-600 font-bold">{qa.avgScore}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Detailed Tracking Table with Delete Option */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="p-6 border-b border-gray-100">
             <h2 className="text-lg font-semibold text-gray-900 font-poppins">Assignment & Review Tracking</h2>
@@ -107,13 +150,14 @@ export default async function SuperAdminDashboard({
                   <th className="px-6 py-4">Agent Name</th>
                   <th className="px-6 py-4">Agent Task</th>
                   <th className="px-6 py-4">QA Review</th>
-                  <th className="px-6 py-4 text-right">Score</th>
+                  <th className="px-6 py-4">Score</th>
+                  <th className="px-6 py-4 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {reports?.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="p-6 text-center text-gray-400 text-sm">No data found for selected dates.</td>
+                    <td colSpan={8} className="p-6 text-center text-gray-400 text-sm">No data found for selected dates.</td>
                   </tr>
                 ) : (
                   reports?.map((row: any) => (
@@ -135,8 +179,18 @@ export default async function SuperAdminDashboard({
                         )}
                       </td>
                       
-                      <td className="px-6 py-4 text-sm font-bold text-gray-900 text-right">
+                      <td className="px-6 py-4 text-sm font-bold text-shikho-indigo-600">
                         {row.overall_score !== null ? `${row.overall_score}%` : '-'}
+                      </td>
+
+                      {/* 🗑️ Delete Button */}
+                      <td className="px-6 py-4 text-right">
+                        <form action={deleteEvaluationAttempt}>
+                          <input type="hidden" name="attempt_id" value={row.attempt_id} />
+                          <button type="submit" className="text-xs font-bold text-red-600 bg-red-50 px-3 py-1.5 rounded hover:bg-red-100 transition-colors">
+                            Delete
+                          </button>
+                        </form>
                       </td>
                     </tr>
                   ))
