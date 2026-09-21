@@ -16,8 +16,8 @@ export async function createEvaluation(formData: FormData) {
   const passing_score = parseInt(formData.get('passing_score') as string)
   const agent_id = formData.get('agent_id') as string
   
-  // 🛠️ FIXED: name mismatch
-  const question_ids = formData.getAll('questions') as string[]
+  // 🛠️ FIXED: ফ্রন্টএন্ডের সাথে মিল রেখে এখানে 'question_ids' দেওয়া হলো
+  const question_ids = formData.getAll('question_ids') as string[]
 
   if (question_ids.length === 0) {
     return redirect('/super-admin/evaluations?error=Please select at least one question.')
@@ -34,13 +34,15 @@ export async function createEvaluation(formData: FormData) {
 
   const attempt_id = `ATT-${Math.floor(1000 + Math.random() * 9000)}`
   
-  await supabase.from('evaluation_attempts').insert({ 
+  const { error: attemptError } = await supabase.from('evaluation_attempts').insert({ 
     attempt_id, 
     evaluation_id: evalData.id, 
     agent_id: agent_id, 
     status: 'ASSIGNED',
     qa_id: user.id 
   })
+
+  if (attemptError) return redirect(`/super-admin/evaluations?error=${attemptError.message}`)
 
   try {
     await sendPushNotification(
