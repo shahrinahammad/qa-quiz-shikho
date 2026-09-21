@@ -34,14 +34,16 @@ export async function createEvaluation(formData: FormData) {
 
   const attempt_id = `ATT-${Math.floor(1000 + Math.random() * 9000)}`
   
-  // qa_id: user.id যুক্ত করা হয়েছে ট্র্যাকিংয়ের জন্য
-  const { error: attemptError } = await supabase
-    .from('evaluation_attempts')
-    .insert({ attempt_id, evaluation_id: evalData.id, agent_id: agent_id, status: 'ASSIGNED', qa_id: user.id })
+  // 🛠️ UPDATE: qa_id: user.id যুক্ত করা হয়েছে ট্র্যাকিংয়ের জন্য
+  await supabase.from('evaluation_attempts').insert({ 
+    attempt_id, 
+    evaluation_id: evalData.id, 
+    agent_id: agent_id, 
+    status: 'ASSIGNED',
+    qa_id: user.id 
+  })
 
-  if (attemptError) return redirect(`/super-admin/evaluations?error=${attemptError.message}`)
-
-  // 🔔 Send Push Notification to Agent (Error handle kora ache jate main kaj fail na hoy)
+  // 🔔 UPDATE: Send Push Notification to Agent
   try {
     await sendPushNotification(
       agent_id, 
@@ -53,7 +55,7 @@ export async function createEvaluation(formData: FormData) {
   }
 
   revalidatePath('/super-admin/evaluations')
-  revalidatePath('/super-admin/dashboard')
+  revalidatePath('/super-admin/dashboard') // ড্যাশবোর্ড যেন সাথে সাথে আপডেট হয়
   
   redirect('/super-admin/evaluations?success=Evaluation assigned successfully!')
 }
