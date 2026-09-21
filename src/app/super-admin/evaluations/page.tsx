@@ -15,19 +15,19 @@ export default async function EvaluationsPage({
 
   const supabaseAdmin = createAdminClient()
   
-  // অ্যাডমিন চাবি দিয়ে এজেন্টদের লিস্ট আনা[cite: 14]
+  // অ্যাডমিন চাবি দিয়ে এজেন্টদের লিস্ট আনা
   const { data: agents } = await supabaseAdmin
     .from('profiles')
     .select('id, email, full_name')
     .eq('role', 'agent')
 
-  // অ্যাডমিন চাবি দিয়ে কোয়েশ্চেন ব্যাংক থেকে সব প্রশ্ন আনা[cite: 14]
+  // অ্যাডমিন চাবি দিয়ে কোয়েশ্চেন ব্যাংক থেকে সব প্রশ্ন আনা
   const { data: questions } = await supabaseAdmin
     .from('questions')
     .select('*')
     .order('created_at', { ascending: false })
 
-  // তৈরি করা ইভালুয়েশনগুলো আনা[cite: 14]
+  // তৈরি করা ইভালুয়েশনগুলো আনা
   const { data: evaluations } = await supabaseAdmin
     .from('evaluations')
     .select('*')
