@@ -3,7 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { sendPushNotification } from '@/app/actions/notification' // 🔔 Push Notification Added
+import { sendPushNotification } from '@/app/actions/notification' 
 
 export async function createEvaluation(formData: FormData) {
   const supabase = createClient()
@@ -16,8 +16,8 @@ export async function createEvaluation(formData: FormData) {
   const passing_score = parseInt(formData.get('passing_score') as string)
   const agent_id = formData.get('agent_id') as string
   
-  // ফর্ম থেকে সিলেক্ট করা প্রশ্নগুলো নেওয়া
-  const question_ids = formData.getAll('question_ids') as string[]
+  // 🛠️ FIXED: name mismatch
+  const question_ids = formData.getAll('questions') as string[]
 
   if (question_ids.length === 0) {
     return redirect('/super-admin/evaluations?error=Please select at least one question.')
@@ -34,7 +34,6 @@ export async function createEvaluation(formData: FormData) {
 
   const attempt_id = `ATT-${Math.floor(1000 + Math.random() * 9000)}`
   
-  // 🛠️ UPDATE: qa_id: user.id যুক্ত করা হয়েছে ট্র্যাকিংয়ের জন্য
   await supabase.from('evaluation_attempts').insert({ 
     attempt_id, 
     evaluation_id: evalData.id, 
@@ -43,7 +42,6 @@ export async function createEvaluation(formData: FormData) {
     qa_id: user.id 
   })
 
-  // 🔔 UPDATE: Send Push Notification to Agent
   try {
     await sendPushNotification(
       agent_id, 
@@ -55,7 +53,7 @@ export async function createEvaluation(formData: FormData) {
   }
 
   revalidatePath('/super-admin/evaluations')
-  revalidatePath('/super-admin/dashboard') // ড্যাশবোর্ড যেন সাথে সাথে আপডেট হয়
+  revalidatePath('/super-admin/dashboard') 
   
   redirect('/super-admin/evaluations?success=Evaluation assigned successfully!')
 }
