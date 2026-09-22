@@ -54,20 +54,25 @@ export async function deleteAgent(formData: FormData) {
   redirect('/qa/users?success=Agent deleted successfully!')
 }
 
-// 🆕 বাল্ক এজেন্ট তৈরি (Excel / CSV থেকে) - শুধুমাত্র QA প্যানেলের জন্য
+// 🆕 বাল্ক এজেন্ট তৈরি (CSV File Upload থেকে) - শুধুমাত্র QA প্যানেলের জন্য
 export async function createBulkAgents(formData: FormData) {
-  const bulkData = formData.get('bulkData') as string
-  if (!bulkData) return redirect('/qa/users?error=No data provided')
+  const file = formData.get('file') as File
+  if (!file) return redirect('/qa/users?error=No file uploaded')
+
+  const text = await file.text()
+  const rows = text.split('\n').filter(row => row.trim() !== '')
 
   const supabaseAdmin = createAdminClient()
-  
-  const rows = bulkData.split('\n').filter(row => row.trim() !== '')
   let successCount = 0
   let errorCount = 0
 
-  for (const row of rows) {
-    const separator = row.includes('\t') ? '\t' : ','
-    const columns = row.split(separator).map(c => c.trim())
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i]
+    
+    // হেডার লাইন ইগনোর করার জন্য
+    if (row.toLowerCase().includes('email')) continue;
+
+    const columns = row.split(',').map(c => c.trim())
     
     if (columns.length >= 2) {
       const email = columns[0]
