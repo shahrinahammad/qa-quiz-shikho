@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
-import { createBulkUsers } from './actions' // 🆕 Bulk Action Import
+import { createBulkUsers } from './actions' 
 
 export default async function UsersPage({ searchParams }: { searchParams: { error?: string, success?: string } }) {
   const supabase = createClient()
@@ -104,14 +104,31 @@ export default async function UsersPage({ searchParams }: { searchParams: { erro
               </form>
             </div>
 
-            {/* 🆕 Bulk Create User (Excel) */}
+            {/* 🆕 Bulk Create User (CSV Upload) */}
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-green-100 h-fit">
-              <h2 className="text-lg font-semibold text-green-700 mb-2 font-poppins">Bulk Create (Excel)</h2>
-              <p className="text-[11px] text-gray-500 mb-4 leading-tight">Copy rows from Excel and paste below.<br/>Format: <b>Email | Name | Password | Role</b></p>
+              <div className="flex justify-between items-center mb-2">
+                <h2 className="text-lg font-semibold text-green-700 font-poppins">Bulk Create</h2>
+                {/* 📥 Download Demo Button */}
+                <a 
+                  href="data:text/csv;charset=utf-8,Email,Name,Password,Role%0Aagent1@shikho.com,John Doe,Shikho@123,agent" 
+                  download="shikho_users_template.csv" 
+                  className="text-[10px] font-bold bg-green-50 text-green-700 px-2 py-1 rounded hover:bg-green-100 transition-colors border border-green-200"
+                >
+                  📥 Download Demo
+                </a>
+              </div>
+              <p className="text-[11px] text-gray-500 mb-4 leading-tight">Download the template, fill it in Excel, and upload.</p>
+              
               <form action={createBulkUsers} className="space-y-4">
-                <textarea name="bulkData" required rows={4} className="w-full px-3 py-2 rounded-lg border text-xs font-poppins focus:ring-2 focus:ring-green-500 whitespace-pre" placeholder="user1@email.com   John Doe   Pass123   agent&#10;user2@email.com   Jane Doe   Pass123   qa"></textarea>
+                <input 
+                  type="file" 
+                  name="file" 
+                  accept=".csv" 
+                  required 
+                  className="w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100 cursor-pointer" 
+                />
                 <button type="submit" className="w-full bg-green-600 text-white py-2.5 rounded-lg font-poppins font-bold hover:bg-green-700 shadow-sm">
-                  Upload Bulk Users
+                  Upload & Create Users
                 </button>
               </form>
             </div>
