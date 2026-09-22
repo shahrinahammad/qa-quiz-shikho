@@ -100,28 +100,32 @@ export async function deleteUser(formData: FormData) {
   redirect('/super-admin/users?success=User deleted successfully!')
 }
 
-// ৫. বাল্ক ইউজার তৈরি (Excel / CSV থেকে)
+// ৫. বাল্ক ইউজার তৈরি (CSV File Upload থেকে)
 export async function createBulkUsers(formData: FormData) {
-  const bulkData = formData.get('bulkData') as string
-  if (!bulkData) return redirect('/super-admin/users?error=No data provided')
+  const file = formData.get('file') as File
+  if (!file) return redirect('/super-admin/users?error=No file uploaded')
+
+  // ফাইলটিকে টেক্সটে কনভার্ট করা
+  const text = await file.text()
+  const rows = text.split('\n').filter(row => row.trim() !== '')
 
   const supabaseAdmin = createAdminClient()
-  
-  // লাইন বাই লাইন ভাগ করা
-  const rows = bulkData.split('\n').filter(row => row.trim() !== '')
   let successCount = 0
   let errorCount = 0
 
-  for (const row of rows) {
-    // Excel থেকে কপি করলে ট্যাব (\t) থাকে, আর CSV হলে কমা (,) থাকে
-    const separator = row.includes('\t') ? '\t' : ','
-    const columns = row.split(separator).map(c => c.trim())
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i]
+    
+    // হেডার লাইন (Email, Name...) ইগনোর করার জন্য
+    if (row.toLowerCase().includes('email')) continue;
+
+    const columns = row.split(',').map(c => c.trim())
     
     if (columns.length >= 2) {
       const email = columns[0]
       const fullName = columns[1]
-      const password = columns[2] || 'Shikho@123' // ডিফল্ট পাসওয়ার্ড
-      const role = columns[3] ? columns[3].toLowerCase() : 'agent' // ডিফল্ট রোল
+      const password = columns[2] || 'Shikho@123' 
+      const role = columns[3] ? columns[3].toLowerCase() : 'agent' 
 
       if (email) {
         const { data, error } = await supabaseAdmin.auth.admin.createUser({
