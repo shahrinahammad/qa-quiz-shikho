@@ -42,7 +42,7 @@ export async function createUser(formData: FormData) {
   redirect('/super-admin/users?success=User created successfully!')
 }
 
-// ২. পাসওয়ার্ড রিসেট
+// ২. পাসওয়ার্ড রিসেট
 export async function resetUserPassword(formData: FormData) {
   const userId = formData.get('userId') as string
   const newPassword = formData.get('newPassword') as string
@@ -98,4 +98,53 @@ export async function deleteUser(formData: FormData) {
   
   revalidatePath('/super-admin/users')
   redirect('/super-admin/users?success=User deleted successfully!')
+}
+
+// ৫. বাল্ক ইউজার তৈরি (Excel / CSV থেকে)
+export async function createBulkUsers(formData: FormData) {
+  const bulkData = formData.get('bulkData') as string
+  if (!bulkData) return redirect('/super-admin/users?error=No data provided')
+
+  const supabaseAdmin = createAdminClient()
+  
+  // লাইন বাই লাইন ভাগ করা
+  const rows = bulkData.split('\n').filter(row => row.trim() !== '')
+  let successCount = 0
+  let errorCount = 0
+
+  for (const row of rows) {
+    // Excel থেকে কপি করলে ট্যাব (\t) থাকে, আর CSV হলে কমা (,) থাকে
+    const separator = row.includes('\t') ? '\t' : ','
+    const columns = row.split(separator).map(c => c.trim())
+    
+    if (columns.length >= 2) {
+      const email = columns[0]
+      const fullName = columns[1]
+      const password = columns[2] || 'Shikho@123' // ডিফল্ট পাসওয়ার্ড
+      const role = columns[3] ? columns[3].toLowerCase() : 'agent' // ডিফল্ট রোল
+
+      if (email) {
+        const { data, error } = await supabaseAdmin.auth.admin.createUser({
+          email,
+          password,
+          email_confirm: true,
+        })
+
+        if (!error && data?.user) {
+          await supabaseAdmin.from('profiles').upsert({
+            id: data.user.id,
+            email: email,
+            full_name: fullName,
+            role: role
+          })
+          successCount++
+        } else {
+          errorCount++
+        }
+      }
+    }
+  }
+
+  revalidatePath('/super-admin/users')
+  redirect(`/super-admin/users?success=Bulk upload complete! Created: ${successCount}, Failed: ${errorCount}`)
 }
