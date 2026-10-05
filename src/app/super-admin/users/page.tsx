@@ -3,6 +3,10 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { 
+  createUser,
+  resetUserPassword,
+  updateUserRole,
+  deleteUser,
   createBulkUsers, 
   sendIndividualEmailAction, 
   sendBulkEmailsToAllAction 
@@ -28,7 +32,7 @@ export default async function UsersPage({ searchParams }: { searchParams: { erro
     u.email?.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  // Action 1: Update Name
+  // Action 1: Update Name 
   const updateName = async (formData: FormData) => {
     'use server'
     const userId = formData.get('userId') as string
@@ -36,51 +40,6 @@ export default async function UsersPage({ searchParams }: { searchParams: { erro
     if (!userId || !newName) return
     const adminClient = createAdminClient()
     await adminClient.from('profiles').update({ full_name: newName }).eq('id', userId)
-    revalidatePath('/super-admin/users')
-  }
-
-  // Action 2: Create User
-  const createUser = async (formData: FormData) => {
-    'use server'
-    const email = formData.get('email') as string
-    const password = formData.get('password') as string
-    const fullName = formData.get('fullName') as string
-    const role = formData.get('role') as string
-    const adminClient = createAdminClient()
-    const { data } = await adminClient.auth.admin.createUser({ email, password, email_confirm: true })
-    if (data.user) {
-      await adminClient.from('profiles').upsert({ id: data.user.id, email: email, full_name: fullName, role: role, temp_password: password })
-    }
-    revalidatePath('/super-admin/users')
-  }
-
-  // Action 3: Delete User
-  const deleteUser = async (formData: FormData) => {
-    'use server'
-    const userId = formData.get('userId') as string
-    const adminClient = createAdminClient()
-    await adminClient.from('profiles').delete().eq('id', userId)
-    await adminClient.auth.admin.deleteUser(userId)
-    revalidatePath('/super-admin/users')
-  }
-
-  // Action 4: Update Role
-  const updateRole = async (formData: FormData) => {
-    'use server'
-    const userId = formData.get('userId') as string
-    const newRole = formData.get('newRole') as string
-    const adminClient = createAdminClient()
-    await adminClient.from('profiles').update({ role: newRole }).eq('id', userId)
-    revalidatePath('/super-admin/users')
-  }
-
-  // Action 5: Reset Password
-  const resetPassword = async (formData: FormData) => {
-    'use server'
-    const userId = formData.get('userId') as string
-    const adminClient = createAdminClient()
-    await adminClient.auth.admin.updateUserById(userId, { password: 'Password@123' })
-    await adminClient.from('profiles').update({ temp_password: 'Password@123' }).eq('id', userId)
     revalidatePath('/super-admin/users')
   }
 
@@ -115,14 +74,16 @@ export default async function UsersPage({ searchParams }: { searchParams: { erro
               <form action={createUser} className="space-y-4">
                 <input type="text" name="fullName" required className="w-full px-4 py-2 rounded-lg border text-sm font-poppins focus:ring-2 focus:ring-shikho-indigo-500" placeholder="Full Name" />
                 <input type="email" name="email" required className="w-full px-4 py-2 rounded-lg border text-sm font-poppins focus:ring-2 focus:ring-shikho-indigo-500" placeholder="Email Address" />
-                <input type="text" name="password" required className="w-full px-4 py-2 rounded-lg border text-sm font-poppins focus:ring-2 focus:ring-shikho-indigo-500" defaultValue="Shikho@123" />
+                
+                {/* 🛑 Password input box ti eখান theke shoriye deya hoyeche */}
+                
                 <select name="role" required className="w-full px-4 py-2 rounded-lg border text-sm font-poppins focus:ring-2 focus:ring-shikho-indigo-500 bg-white">
                   <option value="agent">Agent (Trainee)</option>
                   <option value="qa">QA</option>
                   <option value="super_admin">Super Admin</option>
                 </select>
                 <button type="submit" className="w-full bg-shikho-indigo-600 text-white py-2.5 rounded-lg font-poppins font-bold hover:bg-shikho-indigo-700 mt-4 shadow-sm">
-                  Create Account
+                  Create Account (Auto Password)
                 </button>
               </form>
             </div>
@@ -136,8 +97,9 @@ export default async function UsersPage({ searchParams }: { searchParams: { erro
                 </a>
               </div>
               <div className="flex gap-2 mb-4">
-                <a href="data:text/csv;charset=utf-8,Email,Name,Password,Role%0Aagent1@shikho.com,John Doe,Shikho@123,agent" download="shikho_users_template.csv" className="text-[10px] font-bold text-gray-500 hover:text-green-600 hover:underline">
-                  Download Demo CSV
+                {/* 🛑 Password chara new Download link */}
+                <a href="data:text/csv;charset=utf-8,Email,Name,Role%0Aagent1@shikho.com,John Doe,agent" download="shikho_users_template.csv" className="text-[10px] font-bold text-gray-500 hover:text-green-600 hover:underline">
+                  Download Demo CSV (No Password)
                 </a>
               </div>
               <form action={createBulkUsers} className="space-y-4">
@@ -161,11 +123,11 @@ export default async function UsersPage({ searchParams }: { searchParams: { erro
                   name="q" 
                   defaultValue={searchQuery} 
                   placeholder="Search by name or email..." 
-                  className="w-full md:w-64 px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-shikho-indigo-500" 
+                  className="w-full md:w-64 px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-shikho-indigo-500 font-poppins" 
                 />
-                <button type="submit" className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-bold hover:bg-gray-200">Search</button>
+                <button type="submit" className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-bold hover:bg-gray-200 font-poppins">Search</button>
                 {searchQuery && (
-                  <a href="/super-admin/users" className="bg-red-50 text-red-600 px-4 py-2 rounded-lg text-sm font-bold hover:bg-red-100 flex items-center">
+                  <a href="/super-admin/users" className="bg-red-50 text-red-600 px-4 py-2 rounded-lg text-sm font-bold hover:bg-red-100 flex items-center font-poppins">
                     Clear
                   </a>
                 )}
@@ -185,7 +147,7 @@ export default async function UsersPage({ searchParams }: { searchParams: { erro
                 <tbody className="divide-y divide-gray-100">
                   {users?.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="text-center py-8 text-gray-500 text-sm">No users found.</td>
+                      <td colSpan={4} className="text-center py-8 text-gray-500 text-sm font-poppins">No users found.</td>
                     </tr>
                   ) : (
                     users?.map((u) => (
@@ -193,20 +155,20 @@ export default async function UsersPage({ searchParams }: { searchParams: { erro
                         <td className="px-6 py-4">
                           <form action={updateName} className="flex items-center gap-2 mb-1">
                             <input type="hidden" name="userId" value={u.id} />
-                            <input type="text" name="newName" defaultValue={u.full_name} className="px-2 py-1 text-sm font-bold text-gray-900 border border-gray-200 rounded focus:ring-2 focus:ring-shikho-indigo-500 w-40" />
+                            <input type="text" name="newName" defaultValue={u.full_name} className="px-2 py-1 text-sm font-bold text-gray-900 border border-gray-200 rounded focus:ring-2 focus:ring-shikho-indigo-500 w-40 font-poppins" />
                             <button type="submit" className="text-[10px] font-bold bg-green-50 text-green-600 px-2 py-1 rounded hover:bg-green-100 transition-colors">Save</button>
                           </form>
                           <div className="text-xs text-gray-500 font-poppins pl-1">{u.email}</div>
                         </td>
                         <td className="px-6 py-4">
-                          <span className="px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600 uppercase">
+                          <span className="px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600 uppercase font-poppins">
                             {u.role.replace('_', ' ')}
                           </span>
                         </td>
                         <td className="px-6 py-4">
-                          <form action={updateRole} className="flex items-center gap-2">
+                          <form action={updateUserRole} className="flex items-center gap-2">
                             <input type="hidden" name="userId" value={u.id} />
-                            <select name="newRole" defaultValue={u.role} className="text-xs border border-gray-200 rounded p-1 bg-white focus:outline-none">
+                            <select name="role" defaultValue={u.role} className="text-xs border border-gray-200 rounded p-1 bg-white focus:outline-none font-poppins">
                               <option value="agent">Agent</option>
                               <option value="qa">QA</option>
                               <option value="super_admin">Super Admin</option>
@@ -216,20 +178,19 @@ export default async function UsersPage({ searchParams }: { searchParams: { erro
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex justify-end gap-2 flex-wrap">
-                            {/* Individual Email Button */}
                             <form action={sendIndividualEmailAction}>
                               <input type="hidden" name="userId" value={u.id} />
-                              <button type="submit" className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-3 py-1.5 rounded hover:bg-emerald-100 transition-colors">
+                              <button type="submit" className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-3 py-1.5 rounded hover:bg-emerald-100 transition-colors font-poppins">
                                 ✉️ Email
                               </button>
                             </form>
-                            <form action={resetPassword}>
+                            <form action={resetUserPassword}>
                               <input type="hidden" name="userId" value={u.id} />
-                              <button type="submit" className="text-[11px] font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded hover:bg-blue-100 transition-colors">Reset Pass</button>
+                              <button type="submit" className="text-[11px] font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded hover:bg-blue-100 transition-colors font-poppins">Reset Pass</button>
                             </form>
                             <form action={deleteUser}>
                               <input type="hidden" name="userId" value={u.id} />
-                              <button type="submit" className="text-[11px] font-bold text-red-600 bg-red-50 px-3 py-1.5 rounded hover:bg-red-100 transition-colors">Delete</button>
+                              <button type="submit" className="text-[11px] font-bold text-red-600 bg-red-50 px-3 py-1.5 rounded hover:bg-red-100 transition-colors font-poppins">Delete</button>
                             </form>
                           </div>
                         </td>
