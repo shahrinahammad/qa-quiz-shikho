@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createEvaluation } from './actions'
 import { redirect } from 'next/navigation'
+import AgentSelector from './AgentSelector' // 🆕 নতুন কম্পোনেন্ট ইম্পোর্ট
 
 export default async function EvaluationsPage({
   searchParams
@@ -15,19 +16,19 @@ export default async function EvaluationsPage({
 
   const supabaseAdmin = createAdminClient()
   
-  // অ্যাডমিন চাবি দিয়ে এজেন্টদের লিস্ট আনা
+  // অ্যাডমিন চাবি দিয়ে এজেন্টদের লিস্ট আনা
   const { data: agents } = await supabaseAdmin
     .from('profiles')
     .select('id, email, full_name')
     .eq('role', 'agent')
 
-  // অ্যাডমিন চাবি দিয়ে কোয়েশ্চেন ব্যাংক থেকে সব প্রশ্ন আনা
+  // অ্যাডমিন চাবি দিয়ে কোয়েশ্চেন ব্যাংক থেকে সব প্রশ্ন আনা
   const { data: questions } = await supabaseAdmin
     .from('questions')
     .select('*')
     .order('created_at', { ascending: false })
 
-  // তৈরি করা ইভালুয়েশনগুলো আনা
+  // তৈরি করা ইভালুয়েশনগুলো আনা
   const { data: evaluations } = await supabaseAdmin
     .from('evaluations')
     .select('*')
@@ -51,13 +52,13 @@ export default async function EvaluationsPage({
             <h2 className="text-lg font-semibold text-gray-900 mb-6 font-poppins">Assign New Evaluation</h2>
             
             {searchParams.success && (
-              <div className="mb-4 p-3 bg-green-50 text-green-700 text-sm rounded-lg border border-green-200 break-words">
+              <div className="mb-4 p-3 bg-green-50 text-green-700 text-sm rounded-lg border border-green-200 break-words font-poppins">
                 {searchParams.success}
               </div>
             )}
             
             {searchParams.error && (
-              <div className="mb-4 p-3 bg-red-50 text-shikho-coral-500 text-sm rounded-lg border border-red-200 break-words">
+              <div className="mb-4 p-3 bg-red-50 text-shikho-coral-500 text-sm rounded-lg border border-red-200 break-words font-poppins">
                 {searchParams.error}
               </div>
             )}
@@ -84,19 +85,11 @@ export default async function EvaluationsPage({
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 font-poppins">Assign to Agent</label>
-                <select name="agent_id" required className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-shikho-indigo-500 text-sm bg-white font-poppins">
-                  <option value="">Select an Agent...</option>
-                  {agents?.map(agent => (
-                    <option key={agent.id} value={agent.id}>
-                      {agent.full_name || agent.email}
-                    </option>
-                  ))}
-                </select>
+              {/* 🆕 Agent Multi-Select Component */}
+              <div className="mt-4">
+                <AgentSelector agents={agents || []} />
               </div>
 
-              {/* প্রশ্ন সিলেক্ট করার অপশন (Question Selection) */}
               <div className="mt-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2 font-poppins">Select Questions</label>
                 <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-2 space-y-2 bg-gray-50">
