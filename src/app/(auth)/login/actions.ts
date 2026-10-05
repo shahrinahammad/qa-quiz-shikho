@@ -6,7 +6,9 @@ import { createClient } from '@/lib/supabase/server'
 
 export async function login(formData: FormData) {
   const supabase = createClient()
-  const email = formData.get('email') as string
+  
+  // 🛠️ FIXED: ইমেইলকে ছোট হাতের (lowercase) এবং স্পেস-মুক্ত (trim) করা হলো
+  const email = (formData.get('email') as string).toLowerCase().trim()
   const password = formData.get('password') as string
 
   const { data, error } = await supabase.auth.signInWithPassword({
@@ -29,7 +31,7 @@ export async function login(formData: FormData) {
 
   revalidatePath('/', 'layout')
 
-  // রোল অনুযায়ী সঠিক ড্যাশবোর্ডে পাঠানো
+  // রোল অনুযায়ী সঠিক ড্যাশবোর্ডে পাঠানো
   if (role === 'super_admin') redirect('/super-admin/dashboard')
   if (role === 'qa') redirect('/qa/dashboard')
   
