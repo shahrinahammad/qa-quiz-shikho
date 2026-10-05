@@ -9,7 +9,9 @@ export async function login(formData: FormData) {
   
   // 🛠️ FIXED: ইমেইলকে ছোট হাতের (lowercase) এবং স্পেস-মুক্ত (trim) করা হলো
   const email = (formData.get('email') as string).toLowerCase().trim()
-  const password = formData.get('password') as string
+  
+  // 🛠️ FIXED: পাসওয়ার্ডের শুরুতে বা শেষে ভুলে স্পেস কপি হয়ে গেলে তা মুছে ফেলার জন্য trim() যুক্ত করা হলো
+  const password = (formData.get('password') as string).trim()
 
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
