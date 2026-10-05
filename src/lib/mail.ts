@@ -10,11 +10,11 @@ export async function sendAgentCredentialEmail(to: string, cc: string, name: str
   })
 
   const mailOptions = {
-    from: `"Shikho QA Portal" <${process.env.GMAIL_USER}>`,
+    from: `"QA QUIZ Portal" <${process.env.GMAIL_USER}>`,
     to: to,
     cc: cc,
-    subject: 'Welcome to Shikho QA Portal - Your Credentials',
-    text: `Hello ${name},\n\nYour account has been created successfully.\n\nHere are your login details:\nEmail: ${to}\nPassword: ${pass}\n\nPlease login to the portal and change your password if needed.\n\nBest regards,\nShikho Admin`
+    subject: 'Welcome to QA QUIZ Portal - Your Credentials',
+    text: `Hello ${name},\n\nYour account has been created successfully.\n\nHere are your login details:\nPortal Link: https://qa-quiz-shikho.vercel.app/\nEmail: ${to}\nPassword: ${pass}\n\nPlease login to the portal and change your password if needed.\n\nBest regards,\nQA QUIZ Admin`
   }
 
   await transporter.sendMail(mailOptions)
