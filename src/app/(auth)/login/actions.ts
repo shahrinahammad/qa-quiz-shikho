@@ -6,34 +6,29 @@ import { createClient } from '@/lib/supabase/server'
 
 export async function login(formData: FormData) {
   const supabase = createClient()
-  
-  // 🛠️ FIXED: ইমেইলকে ছোট হাতের (lowercase) এবং স্পেস-মুক্ত (trim) করা হলো
   const email = (formData.get('email') as string).toLowerCase().trim()
-  
-  // 🛠️ FIXED: পাসওয়ার্ডের শুরুতে বা শেষে ভুলে স্পেস কপি হয়ে গেলে তা মুছে ফেলার জন্য trim() যুক্ত করা হলো
   const password = (formData.get('password') as string).trim()
 
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  })
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
   if (error || !data.user) {
     return redirect('/login?message=Could not authenticate user')
   }
 
-  // ইউজারের রোল বের করা
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, force_password_change')
     .eq('id', data.user.id)
     .single()
 
-  const role = profile?.role || 'agent'
-
   revalidatePath('/', 'layout')
 
-  // রোল অনুযায়ী সঠিক ড্যাশবোর্ডে পাঠানো
+  // 🆕 Jodi user first time login kore (ba reset pass kore), take pass change page e pathabo
+  if (profile?.force_password_change) {
+    return redirect('/update-password')
+  }
+
+  const role = profile?.role || 'agent'
   if (role === 'super_admin') redirect('/super-admin/dashboard')
   if (role === 'qa') redirect('/qa/dashboard')
   
