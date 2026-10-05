@@ -1,8 +1,10 @@
 'use server'
 
 import { createAdminClient } from '@/lib/supabase/admin'
+import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { sendAgentCredentialEmail } from '@/lib/mail'
 
 // ১. নতুন ইউজার তৈরি
 export async function createUser(formData: FormData) {
@@ -30,7 +32,8 @@ export async function createUser(formData: FormData) {
         id: data.user.id,
         email: email,
         full_name: fullName,
-        role: role
+        role: role,
+        temp_password: password // এক্সেল ডাউনলোডের জন্য সেভ রাখা হলো
       })
 
     if (profileError) {
@@ -57,6 +60,9 @@ export async function resetUserPassword(formData: FormData) {
     return redirect(`/super-admin/users?error=${encodeURIComponent('Password reset failed: ' + error.message)}`)
   }
 
+  // পাসওয়ার্ড রিসেট হলে temp_password ও আপডেট করে দিচ্ছি
+  await supabaseAdmin.from('profiles').update({ temp_password: newPassword }).eq('id', userId)
+
   revalidatePath('/super-admin/users')
   redirect(`/super-admin/users?success=${encodeURIComponent('Password reset to: ' + newPassword)}`)
 }
@@ -82,16 +88,12 @@ export async function deleteUser(formData: FormData) {
   const userId = formData.get('userId') as string
   const supabaseAdmin = createAdminClient()
   
-  // ১. প্রোফাইল থেকে ডিলিট
   const { error: profileError } = await supabaseAdmin.from('profiles').delete().eq('id', userId)
-  
   if (profileError) {
     return redirect(`/super-admin/users?error=${encodeURIComponent('Cannot delete this user. They might have exam records linked to them.')}`)
   }
 
-  // ২. সিস্টেম (Auth) থেকে ডিলিট
   const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(userId)
-  
   if (authError) {
     return redirect(`/super-admin/users?error=${encodeURIComponent(authError.message)}`)
   }
@@ -100,23 +102,26 @@ export async function deleteUser(formData: FormData) {
   redirect('/super-admin/users?success=User deleted successfully!')
 }
 
-// ৫. বাল্ক ইউজার তৈরি (CSV File Upload থেকে)
+// ৫. বাল্ক ইউজার তৈরি (CSV File Upload, Email & Duplicate Check)
 export async function createBulkUsers(formData: FormData) {
   const file = formData.get('file') as File
   if (!file) return redirect('/super-admin/users?error=No file uploaded')
 
-  // ফাইলটিকে টেক্সটে কনভার্ট করা
+  // অ্যাডমিনের ইমেইল বের করা (CC তে রাখার জন্য)
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const adminEmail = user?.email || ''
+
   const text = await file.text()
   const rows = text.split('\n').filter(row => row.trim() !== '')
 
   const supabaseAdmin = createAdminClient()
   let successCount = 0
+  let existCount = 0
   let errorCount = 0
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]
-    
-    // হেডার লাইন (Email, Name...) ইগনোর করার জন্য
     if (row.toLowerCase().includes('email')) continue;
 
     const columns = row.split(',').map(c => c.trim())
@@ -128,6 +133,15 @@ export async function createBulkUsers(formData: FormData) {
       const role = columns[3] ? columns[3].toLowerCase() : 'agent' 
 
       if (email) {
+        // ১. চেক করা হচ্ছে ইউজার আগে থেকেই আছে কি না
+        const { data: existingUser } = await supabaseAdmin.from('profiles').select('id').eq('email', email).single()
+        
+        if (existingUser) {
+          existCount++ // আগে থেকেই থাকলে স্কিপ করবে
+          continue
+        }
+
+        // ২. নতুন ইউজার তৈরি
         const { data, error } = await supabaseAdmin.auth.admin.createUser({
           email,
           password,
@@ -135,12 +149,22 @@ export async function createBulkUsers(formData: FormData) {
         })
 
         if (!error && data?.user) {
+          // ৩. প্রোফাইলে temp_password সহ সেভ করা
           await supabaseAdmin.from('profiles').upsert({
             id: data.user.id,
             email: email,
             full_name: fullName,
-            role: role
+            role: role,
+            temp_password: password 
           })
+          
+          // ৪. ইমেইল পাঠানো (CC তে অ্যাডমিন)
+          try {
+            await sendAgentCredentialEmail(email, adminEmail, fullName, password)
+          } catch (mailErr) {
+            console.error('Mail sending failed for:', email)
+          }
+
           successCount++
         } else {
           errorCount++
@@ -150,5 +174,5 @@ export async function createBulkUsers(formData: FormData) {
   }
 
   revalidatePath('/super-admin/users')
-  redirect(`/super-admin/users?success=Bulk upload complete! Created: ${successCount}, Failed: ${errorCount}`)
+  redirect(`/super-admin/users?success=Created: ${successCount} | Already Exists: ${existCount} | Failed: ${errorCount}`)
 }
