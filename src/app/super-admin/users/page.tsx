@@ -36,7 +36,7 @@ export default async function UsersPage({ searchParams }: { searchParams: { erro
     const adminClient = createAdminClient()
     const { data } = await adminClient.auth.admin.createUser({ email, password, email_confirm: true })
     if (data.user) {
-      await adminClient.from('profiles').upsert({ id: data.user.id, email: email, full_name: fullName, role: role })
+      await adminClient.from('profiles').upsert({ id: data.user.id, email: email, full_name: fullName, role: role, temp_password: password })
     }
     revalidatePath('/super-admin/users')
   }
@@ -67,6 +67,7 @@ export default async function UsersPage({ searchParams }: { searchParams: { erro
     const userId = formData.get('userId') as string
     const adminClient = createAdminClient()
     await adminClient.auth.admin.updateUserById(userId, { password: 'Password@123' })
+    await adminClient.from('profiles').update({ temp_password: 'Password@123' }).eq('id', userId)
     revalidatePath('/super-admin/users')
   }
 
@@ -108,25 +109,24 @@ export default async function UsersPage({ searchParams }: { searchParams: { erro
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-green-100 h-fit">
               <div className="flex justify-between items-center mb-2">
                 <h2 className="text-lg font-semibold text-green-700 font-poppins">Bulk Create</h2>
-                {/* 📥 Download Demo Button */}
+                
+                {/* 📥 Download Credentials Button */}
                 <a 
-                  href="data:text/csv;charset=utf-8,Email,Name,Password,Role%0Aagent1@shikho.com,John Doe,Shikho@123,agent" 
-                  download="shikho_users_template.csv" 
-                  className="text-[10px] font-bold bg-green-50 text-green-700 px-2 py-1 rounded hover:bg-green-100 transition-colors border border-green-200"
+                  href="/api/export-users" 
+                  className="text-[10px] font-bold bg-shikho-indigo-50 text-shikho-indigo-600 px-2 py-1 rounded hover:bg-shikho-indigo-100 transition-colors border border-shikho-indigo-200"
                 >
-                  📥 Download Demo
+                  📄 Export Passwords
                 </a>
               </div>
-              <p className="text-[11px] text-gray-500 mb-4 leading-tight">Download the template, fill it in Excel, and upload.</p>
+              
+              <div className="flex gap-2 mb-4">
+                <a href="data:text/csv;charset=utf-8,Email,Name,Password,Role%0Aagent1@shikho.com,John Doe,Shikho@123,agent" download="shikho_users_template.csv" className="text-[10px] font-bold text-gray-500 hover:text-green-600 hover:underline">
+                  Download Demo CSV
+                </a>
+              </div>
               
               <form action={createBulkUsers} className="space-y-4">
-                <input 
-                  type="file" 
-                  name="file" 
-                  accept=".csv" 
-                  required 
-                  className="w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100 cursor-pointer" 
-                />
+                <input type="file" name="file" accept=".csv" required className="w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100 cursor-pointer" />
                 <button type="submit" className="w-full bg-green-600 text-white py-2.5 rounded-lg font-poppins font-bold hover:bg-green-700 shadow-sm">
                   Upload & Create Users
                 </button>
