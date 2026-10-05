@@ -65,7 +65,7 @@ export async function resetUserPassword(formData: FormData) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (profile) {
-    try { await sendAgentCredentialEmail(profile.email, user?.email || '', profile.full_name, newPassword) } catch (e) {}
+    try { await sendAgentCredentialEmail(profile.email, user?.email || '', profile.full_name, newPassword, true) } catch (e) {}
   }
 
   revalidatePath('/super-admin/users')
