@@ -26,19 +26,15 @@ export async function createUser(formData: FormData) {
   }
 
   if (data.user) {
-    const { error: profileError } = await supabaseAdmin
+    await supabaseAdmin
       .from('profiles')
       .upsert({
         id: data.user.id,
         email: email,
         full_name: fullName,
         role: role,
-        temp_password: password // এক্সেল ডাউনলোডের জন্য সেভ রাখা হলো
+        temp_password: password
       })
-
-    if (profileError) {
-      return redirect(`/super-admin/users?error=${encodeURIComponent(profileError.message)}`)
-    }
   }
 
   revalidatePath('/super-admin/users')
@@ -60,7 +56,6 @@ export async function resetUserPassword(formData: FormData) {
     return redirect(`/super-admin/users?error=${encodeURIComponent('Password reset failed: ' + error.message)}`)
   }
 
-  // পাসওয়ার্ড রিসেট হলে temp_password ও আপডেট করে দিচ্ছি
   await supabaseAdmin.from('profiles').update({ temp_password: newPassword }).eq('id', userId)
 
   revalidatePath('/super-admin/users')
@@ -75,9 +70,7 @@ export async function updateUserRole(formData: FormData) {
   const supabaseAdmin = createAdminClient()
   const { error } = await supabaseAdmin.from('profiles').update({ role }).eq('id', userId)
   
-  if (error) {
-    return redirect(`/super-admin/users?error=${encodeURIComponent('Failed to update role: ' + error.message)}`)
-  }
+  if (error) return redirect(`/super-admin/users?error=${encodeURIComponent('Failed to update role: ' + error.message)}`)
   
   revalidatePath('/super-admin/users')
   redirect('/super-admin/users?success=User role updated successfully!')
@@ -89,25 +82,20 @@ export async function deleteUser(formData: FormData) {
   const supabaseAdmin = createAdminClient()
   
   const { error: profileError } = await supabaseAdmin.from('profiles').delete().eq('id', userId)
-  if (profileError) {
-    return redirect(`/super-admin/users?error=${encodeURIComponent('Cannot delete this user. They might have exam records linked to them.')}`)
-  }
+  if (profileError) return redirect(`/super-admin/users?error=${encodeURIComponent('Cannot delete this user. They might have exam records linked to them.')}`)
 
   const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(userId)
-  if (authError) {
-    return redirect(`/super-admin/users?error=${encodeURIComponent(authError.message)}`)
-  }
+  if (authError) return redirect(`/super-admin/users?error=${encodeURIComponent(authError.message)}`)
   
   revalidatePath('/super-admin/users')
   redirect('/super-admin/users?success=User deleted successfully!')
 }
 
-// ৫. বাল্ক ইউজার তৈরি (CSV File Upload, Email & Duplicate Check)
+// ৫. বাল্ক ইউজার তৈরি (CSV Upload)
 export async function createBulkUsers(formData: FormData) {
   const file = formData.get('file') as File
   if (!file) return redirect('/super-admin/users?error=No file uploaded')
 
-  // অ্যাডমিনের ইমেইল বের করা (CC তে রাখার জন্য)
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   const adminEmail = user?.email || ''
@@ -133,32 +121,22 @@ export async function createBulkUsers(formData: FormData) {
       const role = columns[3] ? columns[3].toLowerCase() : 'agent' 
 
       if (email) {
-        // ১. চেক করা হচ্ছে ইউজার আগে থেকেই আছে কি না
         const { data: existingUser } = await supabaseAdmin.from('profiles').select('id').eq('email', email).single()
         
         if (existingUser) {
-          existCount++ // আগে থেকেই থাকলে স্কিপ করবে
+          existCount++
           continue
         }
 
-        // ২. নতুন ইউজার তৈরি
         const { data, error } = await supabaseAdmin.auth.admin.createUser({
-          email,
-          password,
-          email_confirm: true,
+          email, password, email_confirm: true,
         })
 
         if (!error && data?.user) {
-          // ৩. প্রোফাইলে temp_password সহ সেভ করা
           await supabaseAdmin.from('profiles').upsert({
-            id: data.user.id,
-            email: email,
-            full_name: fullName,
-            role: role,
-            temp_password: password 
+            id: data.user.id, email: email, full_name: fullName, role: role, temp_password: password 
           })
           
-          // ৪. ইমেইল পাঠানো (CC তে অ্যাডমিন)
           try {
             await sendAgentCredentialEmail(email, adminEmail, fullName, password)
           } catch (mailErr) {
@@ -175,4 +153,51 @@ export async function createBulkUsers(formData: FormData) {
 
   revalidatePath('/super-admin/users')
   redirect(`/super-admin/users?success=Created: ${successCount} | Already Exists: ${existCount} | Failed: ${errorCount}`)
+}
+
+// ৬. Individual মেইল পাঠানো
+export async function sendIndividualEmailAction(formData: FormData) {
+  const userId = formData.get('userId') as string
+  const supabaseAdmin = createAdminClient()
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const adminEmail = user?.email || ''
+
+  const { data: profile } = await supabaseAdmin.from('profiles').select('*').eq('id', userId).single()
+  if (!profile) return redirect('/super-admin/users?error=User not found')
+
+  const pass = profile.temp_password || 'Shikho@123'
+  
+  try {
+    await sendAgentCredentialEmail(profile.email, adminEmail, profile.full_name, pass)
+    return redirect('/super-admin/users?success=Email sent successfully to ' + profile.email)
+  } catch (e) {
+    return redirect('/super-admin/users?error=Failed to send email')
+  }
+}
+
+// ৭. সবাইকে একসাথে মেইল পাঠানো (Send to ALL)
+export async function sendBulkEmailsToAllAction() {
+  const supabaseAdmin = createAdminClient()
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const adminEmail = user?.email || ''
+
+  // শুধুমাত্র এজেন্টদের আনা হচ্ছে
+  const { data: agents } = await supabaseAdmin.from('profiles').select('*').eq('role', 'agent')
+  if (!agents || agents.length === 0) return redirect('/super-admin/users?error=No agents found')
+
+  let sent = 0
+  for (const agent of agents) {
+    const pass = agent.temp_password || 'Shikho@123'
+    try {
+      await sendAgentCredentialEmail(agent.email, adminEmail, agent.full_name, pass)
+      sent++
+    } catch(e) {
+      console.error('Failed for', agent.email)
+    }
+  }
+
+  revalidatePath('/super-admin/users')
+  redirect(`/super-admin/users?success=Successfully sent emails to ${sent} agents!`)
 }
