@@ -15,11 +15,15 @@ export async function createEvaluation(formData: FormData) {
   const duration_minutes = parseInt(formData.get('duration_minutes') as string)
   const passing_score = parseInt(formData.get('passing_score') as string)
   
-  // 🛠️ FIXED: মাল্টিপল এজেন্টের আইডি রিসিভ করা হচ্ছে
+  // 🛠️ FIXED: getAll ব্যবহার করে সবগুলো agent_id রিসিভ করা হচ্ছে
   const agent_ids = formData.getAll('agent_ids') as string[]
   const question_ids = formData.getAll('question_ids') as string[]
 
-  if (agent_ids.length === 0) {
+  // যদি getAll কাজ না করে, তবে JSON parse করে দেখতে পারেন (যদি ফ্রন্টএন্ড থেকে JSON হিসেবে পাঠানো হয়)
+  // const agent_ids_string = formData.get('agent_ids') as string
+  // const agent_ids = agent_ids_string ? JSON.parse(agent_ids_string) : []
+
+  if (!agent_ids || agent_ids.length === 0) {
     return redirect('/super-admin/evaluations?error=Please select at least one agent.')
   }
 
