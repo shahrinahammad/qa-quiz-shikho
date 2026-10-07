@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { deleteEvaluationAttempt, sendIndividualReminder, sendBulkReminder } from './actions'
+import ReportButtons from '@/components/ReportButtons' // 🆕 Report Buttons Import করা হলো
 
 export default async function SuperAdminDashboard({
   searchParams
@@ -116,6 +117,9 @@ export default async function SuperAdminDashboard({
             <Link href="/super-admin/dashboard" className="text-xs font-bold text-red-500 hover:underline px-2 pb-1">Reset</Link>
           </form>
         </header>
+
+        {/* 🆕 Report Buttons Section */}
+        <ReportButtons />
 
         <div className="flex flex-wrap items-center gap-4">
           <Link href="/super-admin/impact-report" className="flex items-center gap-2 bg-gradient-to-r from-shikho-indigo-600 to-shikho-magenta-500 text-white px-6 py-3 rounded-xl font-bold hover:shadow-lg transition-all shadow-sm text-sm font-poppins">
