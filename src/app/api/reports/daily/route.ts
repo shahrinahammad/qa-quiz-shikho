@@ -23,9 +23,8 @@ export async function GET() {
 
     const safeAttempts = attempts || []
     
-    // Data Processing for Email
     const summary = { assigned: safeAttempts.length, submitted: 0, pending: 0, reviewed: 0, recheck: 0 }
-    const qaMap: any = {}; const agentMap: any = {}; const details: any[] = []
+    const qaMap: any = {}; const details: any[] = []
 
     safeAttempts.forEach((a: any) => {
       const qaName = profileMap[a.evaluations?.created_by] || 'Admin'
@@ -36,14 +35,12 @@ export async function GET() {
       if (a.status === 'PUBLISHED') summary.reviewed++
       if (a.status === 'RECHECK_REQUESTED') summary.recheck++
 
-      if (!qaMap[qaName]) qaMap[qaName] = { qaName, assigned: 0, reviewed: 0, recheck: 0 }
+      // 🛠️ FIXED: QA Wise 'submitted' logic added
+      if (!qaMap[qaName]) qaMap[qaName] = { qaName, assigned: 0, submitted: 0, reviewed: 0, recheck: 0 }
       qaMap[qaName].assigned++
+      if (a.status !== 'ASSIGNED') qaMap[qaName].submitted++
       if (a.status === 'PUBLISHED') qaMap[qaName].reviewed++
       if (a.status === 'RECHECK_REQUESTED') qaMap[qaName].recheck++
-
-      if (!agentMap[agentName]) agentMap[agentName] = { agentName, assigned: 0, submitted: 0 }
-      agentMap[agentName].assigned++
-      if (a.status !== 'ASSIGNED') agentMap[agentName].submitted++
 
       details.push({
         date: new Date(a.created_at).toLocaleDateString('en-GB'),
@@ -55,8 +52,7 @@ export async function GET() {
     })
 
     const reportData = {
-      dateRange: dateString, summary, qaStats: Object.values(qaMap), details,
-      agentStats: Object.values(agentMap).map((ag: any) => ({ ...ag, status: ag.submitted > 0 ? 'Attended' : 'Not Attended' }))
+      dateRange: dateString, summary, qaStats: Object.values(qaMap), details
     }
 
     await sendDailyReportEmail('shahrin.ahammad@shikho.com', reportData)
