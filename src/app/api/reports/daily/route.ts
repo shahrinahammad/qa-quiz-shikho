@@ -11,28 +11,32 @@ export async function GET() {
   const startOfDay = new Date(today.setHours(0,0,0,0)).toISOString()
   const endOfDay = new Date(today.setHours(23,59,59,999)).toISOString()
 
-  // আজকের সব কুইজ ফেচ করা
+  // ১. কোনো জয়েনিং ছাড়া সেফলি অ্যাটেম্পট ফেচ করা
   const { data: attempts, error } = await supabaseAdmin
     .from('evaluation_attempts')
-    .select('id, status, agent_id, score, profiles!evaluation_attempts_agent_id_fkey(full_name)')
+    .select('id, status, agent_id, score')
     .gte('created_at', startOfDay)
     .lte('created_at', endOfDay)
 
-  if (error || !attempts) return NextResponse.json({ error: 'Failed to fetch data' }, { status: 500 })
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  const totalAssigned = attempts.length
-  const totalSubmitted = attempts.filter(a => a.status === 'SUBMITTED' || a.status === 'REVIEWED').length
+  // ২. এজেন্টদের নাম ড্যাশবোর্ডের মতো আলাদাভাবে ফেচ করা (যাতে কোনোভাবেই এরর না আসে)
+  const { data: profiles } = await supabaseAdmin.from('profiles').select('id, full_name')
+  const profileMap = profiles?.reduce((acc: any, p: any) => ({ ...acc, [p.id]: p.full_name || 'Agent' }), {}) || {}
+
+  const safeAttempts = attempts || []
+  const totalAssigned = safeAttempts.length
+  const totalSubmitted = safeAttempts.filter(a => a.status !== 'ASSIGNED').length
   const pendingExams = totalAssigned - totalSubmitted
 
-  // এজেন্টদের ডাটা গ্রুপিং
+  // ৩. এজেন্টদের ডেটা গ্রুপিং
   const agentMap: any = {}
-  attempts.forEach(a => {
-    // @ts-ignore
-    const agentName = a.profiles?.full_name || 'Unknown Agent'
+  safeAttempts.forEach(a => {
+    const agentName = profileMap[a.agent_id] || 'Unknown Agent'
     if (!agentMap[agentName]) agentMap[agentName] = { name: agentName, assigned: 0, submitted: 0, totalScore: 0 }
     
     agentMap[agentName].assigned += 1
-    if (a.status === 'SUBMITTED' || a.status === 'REVIEWED') {
+    if (a.status !== 'ASSIGNED') {
       agentMap[agentName].submitted += 1
       agentMap[agentName].totalScore += (a.score || 0)
     }
@@ -47,13 +51,12 @@ export async function GET() {
 
   const reportData = { date: dateString, totalAssigned, totalSubmitted, pendingExams, agentStats }
 
-  // 🔴 এখানে আপাতত আপনার ইমেইলটি দিন (টেস্ট কনফার্ম হলে পরে গ্রুপের ইমেইল দিয়ে দেব)
   const adminEmail = 'shahrin.ahammad@shikho.com' 
   
   try {
     await sendDailyReportEmail(adminEmail, reportData)
     return NextResponse.json({ success: true, message: 'Daily report sent!' })
-  } catch (err) {
-    return NextResponse.json({ error: 'Failed to send email' }, { status: 500 })
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
