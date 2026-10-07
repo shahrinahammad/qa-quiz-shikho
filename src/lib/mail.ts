@@ -56,7 +56,7 @@ export async function sendQuizAssignedEmail(to: string, assignerEmail: string, a
   await transporter.sendMail({
     from: `"QA QUIZ Portal" <${process.env.GMAIL_USER}>`,
     to: to,
-    cc: assignerEmail, // 🆕 Assigner CC-তে থাকবে
+    cc: assignerEmail,
     subject: `🚀 Action Required: New Quiz Assigned - ${quizTitle}`,
     html: `
       <div style="font-family: sans-serif; background-color: #f4f7f6; padding: 40px 20px;">
@@ -119,62 +119,142 @@ export async function sendQuizReminderEmail(to: string, agentName: string, quizT
   })
 }
 
-// ৫. ডেইলি রিপোর্ট (আপাতত আপনার মেইলে যাবে)
-export async function sendDailyReportEmail(to: string, reportData: any) {
-  const transporter = getTransporter()
-  const { date, totalAssigned, totalSubmitted, pendingExams, agentStats } = reportData
+// --- রিপোর্টের জন্য গ্লোবাল HTML জেনারেটর ---
+const generateReportHTML = (title: string, dateText: string, color: string, data: any) => {
+  return `
+    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; padding: 30px 10px; color: #333;">
+      <div style="max-width: 800px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
+        
+        <!-- Header -->
+        <div style="background-color: ${color}; padding: 30px; text-align: center;">
+          <h1 style="color: #ffffff; margin: 0; font-size: 26px;">${title}</h1>
+          <p style="color: #f1f5f9; margin: 10px 0 0 0; font-size: 15px;">Date: ${dateText}</p>
+        </div>
 
-  await transporter.sendMail({
-    from: `"QA QUIZ Portal" <${process.env.GMAIL_USER}>`,
-    to: to, // আপাতত আপনার ইমেইল
-    subject: `📊 Daily Quiz Report - ${date}`,
-    html: `
-      <div style="font-family: sans-serif; padding: 20px;">
-        <h2 style="background-color: #3b82f6; color: white; padding: 15px; text-align: center; border-radius: 8px;">Daily Quiz Report - ${date}</h2>
-        <div style="display: flex; gap: 10px; margin: 20px 0;">
-          <div style="flex: 1; padding: 15px; background: #eff6ff; text-align: center; border-radius: 8px;">
-            <h3>Assigned</h3><p style="font-size: 24px; font-weight: bold;">${totalAssigned}</p>
+        <div style="padding: 30px;">
+          <!-- 1. Summary Report -->
+          <h2 style="color: #1e293b; font-size: 18px; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px;">📊 Overall Summary</h2>
+          <div style="display: flex; gap: 15px; margin-bottom: 30px;">
+            <div style="flex: 1; background: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; text-align: center; border-radius: 8px;">
+              <h3 style="margin:0; font-size: 13px; color: #64748b; text-transform: uppercase;">Assigned</h3>
+              <p style="margin: 5px 0 0 0; font-size: 24px; font-weight: bold; color: #0f172a;">${data.summary.assigned}</p>
+            </div>
+            <div style="flex: 1; background: #eff6ff; border: 1px solid #bfdbfe; padding: 15px; text-align: center; border-radius: 8px;">
+              <h3 style="margin:0; font-size: 13px; color: #64748b; text-transform: uppercase;">Submitted</h3>
+              <p style="margin: 5px 0 0 0; font-size: 24px; font-weight: bold; color: #1d4ed8;">${data.summary.submitted}</p>
+            </div>
+            <div style="flex: 1; background: #f0fdf4; border: 1px solid #bbf7d0; padding: 15px; text-align: center; border-radius: 8px;">
+              <h3 style="margin:0; font-size: 13px; color: #64748b; text-transform: uppercase;">QA Reviewed</h3>
+              <p style="margin: 5px 0 0 0; font-size: 24px; font-weight: bold; color: #15803d;">${data.summary.reviewed}</p>
+            </div>
+            <div style="flex: 1; background: #fef2f2; border: 1px solid #fecaca; padding: 15px; text-align: center; border-radius: 8px;">
+              <h3 style="margin:0; font-size: 13px; color: #64748b; text-transform: uppercase;">Pending</h3>
+              <p style="margin: 5px 0 0 0; font-size: 24px; font-weight: bold; color: #b91c1c;">${data.summary.pending}</p>
+            </div>
           </div>
-          <div style="flex: 1; padding: 15px; background: #f0fdf4; text-align: center; border-radius: 8px;">
-            <h3>Submitted</h3><p style="font-size: 24px; font-weight: bold;">${totalSubmitted}</p>
-          </div>
-          <div style="flex: 1; padding: 15px; background: #fef2f2; text-align: center; border-radius: 8px;">
-            <h3>Pending</h3><p style="font-size: 24px; font-weight: bold;">${pendingExams}</p>
+
+          <!-- 2. QA Wise Report -->
+          <h2 style="color: #1e293b; font-size: 18px; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px;">🔎 QA Performance Summary</h2>
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 14px;">
+            <thead>
+              <tr style="background-color: #f1f5f9; text-align: left;">
+                <th style="padding: 10px; border: 1px solid #e2e8f0;">QA Name</th>
+                <th style="padding: 10px; border: 1px solid #e2e8f0; text-align: center;">Total Assign</th>
+                <th style="padding: 10px; border: 1px solid #e2e8f0; text-align: center;">QA Reviewed</th>
+                <th style="padding: 10px; border: 1px solid #e2e8f0; text-align: center;">Re-check Issues</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.qaStats.map((qa: any) => `
+                <tr>
+                  <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">${qa.qaName}</td>
+                  <td style="padding: 10px; border: 1px solid #e2e8f0; text-align: center;">${qa.assigned}</td>
+                  <td style="padding: 10px; border: 1px solid #e2e8f0; text-align: center; color: #15803d; font-weight: bold;">${qa.reviewed}</td>
+                  <td style="padding: 10px; border: 1px solid #e2e8f0; text-align: center; color: #ea580c; font-weight: bold;">${qa.recheck}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+
+          <!-- 3. Agent Attendance Report -->
+          <h2 style="color: #1e293b; font-size: 18px; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px;">👤 Agent Attendance Tracking</h2>
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 14px;">
+            <thead>
+              <tr style="background-color: #f1f5f9; text-align: left;">
+                <th style="padding: 10px; border: 1px solid #e2e8f0;">Agent Name</th>
+                <th style="padding: 10px; border: 1px solid #e2e8f0; text-align: center;">Assigned Task</th>
+                <th style="padding: 10px; border: 1px solid #e2e8f0; text-align: center;">Submitted</th>
+                <th style="padding: 10px; border: 1px solid #e2e8f0; text-align: center;">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.agentStats.map((agent: any) => `
+                <tr>
+                  <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">${agent.agentName}</td>
+                  <td style="padding: 10px; border: 1px solid #e2e8f0; text-align: center;">${agent.assigned}</td>
+                  <td style="padding: 10px; border: 1px solid #e2e8f0; text-align: center;">${agent.submitted}</td>
+                  <td style="padding: 10px; border: 1px solid #e2e8f0; text-align: center; font-weight: bold; color: ${agent.status === 'Attended' ? '#15803d' : '#b91c1c'};">
+                    ${agent.status}
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+
+          <!-- 4. Detailed Exam Breakdown -->
+          <h2 style="color: #1e293b; font-size: 18px; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px;">📝 Detailed Exam Breakdown</h2>
+          <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px;">
+            <thead>
+              <tr style="background-color: #f8fafc; text-align: left;">
+                <th style="padding: 8px; border: 1px solid #e2e8f0;">Date</th>
+                <th style="padding: 8px; border: 1px solid #e2e8f0;">Exam Title</th>
+                <th style="padding: 8px; border: 1px solid #e2e8f0;">Assigned By</th>
+                <th style="padding: 8px; border: 1px solid #e2e8f0;">Agent</th>
+                <th style="padding: 8px; border: 1px solid #e2e8f0;">Status</th>
+                <th style="padding: 8px; border: 1px solid #e2e8f0; text-align: right;">Score</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.details.map((d: any) => `
+                <tr style="background-color: ${d.status === 'Pending' ? '#fff7ed' : '#ffffff'};">
+                  <td style="padding: 8px; border: 1px solid #e2e8f0;">${d.date}</td>
+                  <td style="padding: 8px; border: 1px solid #e2e8f0; font-weight: bold;">${d.examTitle}</td>
+                  <td style="padding: 8px; border: 1px solid #e2e8f0;">${d.qaName}</td>
+                  <td style="padding: 8px; border: 1px solid #e2e8f0;">${d.agentName}</td>
+                  <td style="padding: 8px; border: 1px solid #e2e8f0; font-weight: bold; color: ${d.status === 'Pending' ? '#ea580c' : d.status === 'Reviewed' ? '#15803d' : '#2563eb'};">${d.status}</td>
+                  <td style="padding: 8px; border: 1px solid #e2e8f0; text-align: right; font-weight: bold;">${d.score}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          
+          <div style="text-align: center; margin-top: 30px;">
+            <a href="https://qa-quiz-shikho.vercel.app/super-admin/dashboard" style="display: inline-block; background-color: ${color}; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 14px; padding: 12px 30px; border-radius: 8px;">View Live Dashboard</a>
           </div>
         </div>
-        <h3>Agent Activity:</h3>
-        <table style="width: 100%; border-collapse: collapse; text-align: left;">
-          <tr style="background: #f3f4f6;"><th style="padding: 10px; border: 1px solid #ddd;">Name</th><th style="padding: 10px; border: 1px solid #ddd;">Assigned</th><th style="padding: 10px; border: 1px solid #ddd;">Done</th></tr>
-          ${agentStats.map((a: any) => `<tr><td style="padding: 10px; border: 1px solid #ddd;">${a.name}</td><td style="padding: 10px; border: 1px solid #ddd;">${a.assigned}</td><td style="padding: 10px; border: 1px solid #ddd;">${a.submitted}</td></tr>`).join('')}
-        </table>
       </div>
-    `
-  })
+    </div>
+  `
 }
 
-// ৬. উইকলি রিপোর্ট (আপাতত আপনার মেইলে যাবে)
-export async function sendWeeklyReportEmail(to: string, reportData: any) {
+// ৫. ডেইলি রিপোর্ট ফাংশন 
+export async function sendDailyReportEmail(to: string, reportData: any) {
   const transporter = getTransporter()
-  const { weekRange, totalAssigned, totalSubmitted, pendingExams, topPerformers } = reportData
-
   await transporter.sendMail({
     from: `"QA QUIZ Portal" <${process.env.GMAIL_USER}>`,
     to: to,
-    subject: `📈 Weekly Performance Report - ${weekRange}`,
-    html: `
-      <div style="font-family: sans-serif; padding: 20px;">
-        <h2 style="background-color: #8b5cf6; color: white; padding: 15px; text-align: center; border-radius: 8px;">Weekly QA Report</h2>
-        <p style="text-align: center;"><strong>${weekRange}</strong></p>
-        <div style="display: flex; gap: 10px; margin: 20px 0;">
-          <div style="flex: 1; padding: 15px; background: #f5f3ff; text-align: center; border-radius: 8px;">
-            <h3>Total Assigned</h3><p style="font-size: 24px; font-weight: bold;">${totalAssigned}</p>
-          </div>
-          <div style="flex: 1; padding: 15px; background: #f0fdf4; text-align: center; border-radius: 8px;">
-            <h3>Total Completed</h3><p style="font-size: 24px; font-weight: bold;">${totalSubmitted}</p>
-          </div>
-        </div>
-        <a href="https://qa-quiz-shikho.vercel.app/super-admin/dashboard" style="display: block; text-align: center; background-color: #8b5cf6; color: white; padding: 12px; border-radius: 8px; text-decoration: none;">View Full Analytics</a>
-      </div>
-    `
+    subject: `📊 Daily Quiz Report - ${reportData.dateRange}`,
+    html: generateReportHTML('Daily Quiz Report', reportData.dateRange, '#3b82f6', reportData) 
+  })
+}
+
+// ৬. উইকলি রিপোর্ট ফাংশন 
+export async function sendWeeklyReportEmail(to: string, reportData: any) {
+  const transporter = getTransporter()
+  await transporter.sendMail({
+    from: `"QA QUIZ Portal" <${process.env.GMAIL_USER}>`,
+    to: to,
+    subject: `📈 Weekly Performance Report - ${reportData.dateRange}`,
+    html: generateReportHTML('Weekly Performance Report', reportData.dateRange, '#8b5cf6', reportData) 
   })
 }
