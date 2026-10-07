@@ -10,7 +10,7 @@ const getTransporter = () => {
   })
 }
 
-// ১. আইডি তৈরি / পাসওয়ার্ড রিসেট (শুধুমাত্র ইউজারের কাছে যাবে, কোনো CC থাকবে না)
+// ১. আইডি তৈরি / পাসওয়ার্ড রিসেট (CC ছাড়া)
 export async function sendAgentCredentialEmail(to: string, name: string, pass: string, isReset: boolean = false) {
   const transporter = getTransporter()
   const subject = isReset ? '🔒 Security Update: Your Password Has Been Reset' : '🎉 Welcome to QA QUIZ Portal - Your Login Credentials!'
@@ -50,7 +50,7 @@ export async function sendAgentCredentialEmail(to: string, name: string, pass: s
   })
 }
 
-// ২. নতুন কুইজ অ্যাসাইন (এজেন্ট পাবে + Assigner CC-তে পাবে)
+// ২. নতুন কুইজ অ্যাসাইন
 export async function sendQuizAssignedEmail(to: string, assignerEmail: string, agentName: string, quizTitle: string, duration: number, passScore: number, assignerName: string) {
   const transporter = getTransporter()
   await transporter.sendMail({
@@ -83,7 +83,7 @@ export async function sendQuizAssignedEmail(to: string, assignerEmail: string, a
   })
 }
 
-// ৩. কুইজ সাবমিট হলে রিভিউ এর জন্য Assigner-কে মেইল
+// ৩. কুইজ সাবমিট হলে রিভিউ মেইল
 export async function sendQuizSubmittedEmail(assignerEmail: string, assignerName: string, agentName: string, quizTitle: string) {
   const transporter = getTransporter()
   await transporter.sendMail({
@@ -101,7 +101,7 @@ export async function sendQuizSubmittedEmail(assignerEmail: string, assignerName
   })
 }
 
-// ৪. কুইজ সাবমিট না করলে ২ ঘন্টা পর সফট রিমাইন্ডার (এজেন্টকে)
+// ৪. রিমাইন্ডার মেইল
 export async function sendQuizReminderEmail(to: string, agentName: string, quizTitle: string) {
   const transporter = getTransporter()
   await transporter.sendMail({
@@ -121,6 +121,9 @@ export async function sendQuizReminderEmail(to: string, agentName: string, quizT
 
 // --- রিপোর্টের জন্য গ্লোবাল HTML জেনারেটর ---
 const generateReportHTML = (title: string, dateText: string, color: string, data: any) => {
+  const submittedList = data.details.filter((d: any) => d.status !== 'Pending');
+  const pendingList = data.details.filter((d: any) => d.status === 'Pending');
+
   return `
     <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; padding: 30px 10px; color: #333;">
       <div style="max-width: 800px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
@@ -132,7 +135,7 @@ const generateReportHTML = (title: string, dateText: string, color: string, data
         </div>
 
         <div style="padding: 30px;">
-          <!-- 1. Summary Report -->
+          <!-- 1. Overall Summary -->
           <h2 style="color: #1e293b; font-size: 18px; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px;">📊 Overall Summary</h2>
           <div style="display: flex; gap: 15px; margin-bottom: 30px;">
             <div style="flex: 1; background: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; text-align: center; border-radius: 8px;">
@@ -153,76 +156,70 @@ const generateReportHTML = (title: string, dateText: string, color: string, data
             </div>
           </div>
 
-          <!-- 2. QA Wise Report -->
+          <!-- 2. QA Performance Summary (Dashboard Look) -->
           <h2 style="color: #1e293b; font-size: 18px; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px;">🔎 QA Performance Summary</h2>
-          <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 14px;">
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 14px; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px;">
             <thead>
-              <tr style="background-color: #f1f5f9; text-align: left;">
-                <th style="padding: 10px; border: 1px solid #e2e8f0;">QA Name</th>
-                <th style="padding: 10px; border: 1px solid #e2e8f0; text-align: center;">Total Assign</th>
-                <th style="padding: 10px; border: 1px solid #e2e8f0; text-align: center;">QA Reviewed</th>
-                <th style="padding: 10px; border: 1px solid #e2e8f0; text-align: center;">Re-check Issues</th>
+              <tr style="background-color: #f8fafc; text-align: left; text-transform: uppercase; font-size: 11px; color: #64748b;">
+                <th style="padding: 12px; border-bottom: 1px solid #e2e8f0;">QA Name</th>
+                <th style="padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: center;">Total Assign</th>
+                <th style="padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: center;">Agent Submitted</th>
+                <th style="padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: center;">QA Reviewed</th>
+                <th style="padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: center;">Re-check Issues</th>
               </tr>
             </thead>
             <tbody>
               ${data.qaStats.map((qa: any) => `
                 <tr>
-                  <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">${qa.qaName}</td>
-                  <td style="padding: 10px; border: 1px solid #e2e8f0; text-align: center;">${qa.assigned}</td>
-                  <td style="padding: 10px; border: 1px solid #e2e8f0; text-align: center; color: #15803d; font-weight: bold;">${qa.reviewed}</td>
-                  <td style="padding: 10px; border: 1px solid #e2e8f0; text-align: center; color: #ea580c; font-weight: bold;">${qa.recheck}</td>
+                  <td style="padding: 12px; border-bottom: 1px solid #f1f5f9; font-weight: bold; color: #0f172a;">${qa.qaName}</td>
+                  <td style="padding: 12px; border-bottom: 1px solid #f1f5f9; text-align: center; color: #475569; font-weight: bold;">${qa.assigned}</td>
+                  <td style="padding: 12px; border-bottom: 1px solid #f1f5f9; text-align: center; color: #2563eb; font-weight: bold;">${qa.submitted}</td>
+                  <td style="padding: 12px; border-bottom: 1px solid #f1f5f9; text-align: center; color: #16a34a; font-weight: bold;">${qa.reviewed}</td>
+                  <td style="padding: 12px; border-bottom: 1px solid #f1f5f9; text-align: center; color: #ea580c; font-weight: bold;">${qa.recheck}</td>
                 </tr>
               `).join('')}
             </tbody>
           </table>
 
-          <!-- 3. Agent Attendance Report -->
-          <h2 style="color: #1e293b; font-size: 18px; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px;">👤 Agent Attendance Tracking</h2>
-          <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 14px;">
+          <!-- 3. Submitted Agent Details -->
+          <h2 style="color: #1e293b; font-size: 18px; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px;">✅ Submitted Agent Details</h2>
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 13px;">
             <thead>
               <tr style="background-color: #f1f5f9; text-align: left;">
                 <th style="padding: 10px; border: 1px solid #e2e8f0;">Agent Name</th>
-                <th style="padding: 10px; border: 1px solid #e2e8f0; text-align: center;">Assigned Task</th>
-                <th style="padding: 10px; border: 1px solid #e2e8f0; text-align: center;">Submitted</th>
-                <th style="padding: 10px; border: 1px solid #e2e8f0; text-align: center;">Status</th>
+                <th style="padding: 10px; border: 1px solid #e2e8f0;">QA Name</th>
+                <th style="padding: 10px; border: 1px solid #e2e8f0; text-align: center;">Review Status</th>
+                <th style="padding: 10px; border: 1px solid #e2e8f0; text-align: right;">Score</th>
               </tr>
             </thead>
             <tbody>
-              ${data.agentStats.map((agent: any) => `
+              ${submittedList.length === 0 ? '<tr><td colspan="4" style="padding: 15px; text-align: center; color: #64748b; border: 1px solid #e2e8f0;">No submitted exams found.</td></tr>' : 
+                submittedList.map((d: any) => `
                 <tr>
-                  <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">${agent.agentName}</td>
-                  <td style="padding: 10px; border: 1px solid #e2e8f0; text-align: center;">${agent.assigned}</td>
-                  <td style="padding: 10px; border: 1px solid #e2e8f0; text-align: center;">${agent.submitted}</td>
-                  <td style="padding: 10px; border: 1px solid #e2e8f0; text-align: center; font-weight: bold; color: ${agent.status === 'Attended' ? '#15803d' : '#b91c1c'};">
-                    ${agent.status}
-                  </td>
+                  <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">${d.agentName}</td>
+                  <td style="padding: 10px; border: 1px solid #e2e8f0; color: #475569;">${d.qaName}</td>
+                  <td style="padding: 10px; border: 1px solid #e2e8f0; text-align: center; font-weight: bold; color: ${d.status === 'Reviewed' ? '#15803d' : '#2563eb'};">${d.status}</td>
+                  <td style="padding: 10px; border: 1px solid #e2e8f0; text-align: right; font-weight: bold;">${d.score}</td>
                 </tr>
               `).join('')}
             </tbody>
           </table>
 
-          <!-- 4. Detailed Exam Breakdown -->
-          <h2 style="color: #1e293b; font-size: 18px; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px;">📝 Detailed Exam Breakdown</h2>
-          <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px;">
+          <!-- 4. Not Attended List -->
+          <h2 style="color: #1e293b; font-size: 18px; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px;">❌ Not Attended (Pending)</h2>
+          <table style="width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 20px;">
             <thead>
-              <tr style="background-color: #f8fafc; text-align: left;">
-                <th style="padding: 8px; border: 1px solid #e2e8f0;">Date</th>
-                <th style="padding: 8px; border: 1px solid #e2e8f0;">Exam Title</th>
-                <th style="padding: 8px; border: 1px solid #e2e8f0;">Assigned By</th>
-                <th style="padding: 8px; border: 1px solid #e2e8f0;">Agent</th>
-                <th style="padding: 8px; border: 1px solid #e2e8f0;">Status</th>
-                <th style="padding: 8px; border: 1px solid #e2e8f0; text-align: right;">Score</th>
+              <tr style="background-color: #fef2f2; text-align: left;">
+                <th style="padding: 10px; border: 1px solid #fecaca; color: #991b1b;">Agent Name</th>
+                <th style="padding: 10px; border: 1px solid #fecaca; color: #991b1b;">Assigned QA</th>
               </tr>
             </thead>
             <tbody>
-              ${data.details.map((d: any) => `
-                <tr style="background-color: ${d.status === 'Pending' ? '#fff7ed' : '#ffffff'};">
-                  <td style="padding: 8px; border: 1px solid #e2e8f0;">${d.date}</td>
-                  <td style="padding: 8px; border: 1px solid #e2e8f0; font-weight: bold;">${d.examTitle}</td>
-                  <td style="padding: 8px; border: 1px solid #e2e8f0;">${d.qaName}</td>
-                  <td style="padding: 8px; border: 1px solid #e2e8f0;">${d.agentName}</td>
-                  <td style="padding: 8px; border: 1px solid #e2e8f0; font-weight: bold; color: ${d.status === 'Pending' ? '#ea580c' : d.status === 'Reviewed' ? '#15803d' : '#2563eb'};">${d.status}</td>
-                  <td style="padding: 8px; border: 1px solid #e2e8f0; text-align: right; font-weight: bold;">${d.score}</td>
+              ${pendingList.length === 0 ? '<tr><td colspan="2" style="padding: 15px; text-align: center; color: #64748b; border: 1px solid #fecaca;">Everyone has submitted their exams! 🎉</td></tr>' : 
+                pendingList.map((d: any) => `
+                <tr>
+                  <td style="padding: 10px; border: 1px solid #fecaca; font-weight: bold; color: #b91c1c;">${d.agentName}</td>
+                  <td style="padding: 10px; border: 1px solid #fecaca; color: #b91c1c;">${d.qaName}</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -237,7 +234,6 @@ const generateReportHTML = (title: string, dateText: string, color: string, data
   `
 }
 
-// ৫. ডেইলি রিপোর্ট ফাংশন 
 export async function sendDailyReportEmail(to: string, reportData: any) {
   const transporter = getTransporter()
   await transporter.sendMail({
@@ -248,7 +244,6 @@ export async function sendDailyReportEmail(to: string, reportData: any) {
   })
 }
 
-// ৬. উইকলি রিপোর্ট ফাংশন 
 export async function sendWeeklyReportEmail(to: string, reportData: any) {
   const transporter = getTransporter()
   await transporter.sendMail({
