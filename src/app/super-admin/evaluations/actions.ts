@@ -1,9 +1,11 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { sendPushNotification } from '@/app/actions/notification' 
+import { sendPushNotification } from '@/app/actions/notification'
+import { sendQuizAssignedEmail } from '@/lib/mail' // 🆕 ইমেইল ফাংশন ইমপোর্ট করা হলো
 
 export async function createEvaluation(formData: FormData) {
   const supabase = createClient()
@@ -15,13 +17,8 @@ export async function createEvaluation(formData: FormData) {
   const duration_minutes = parseInt(formData.get('duration_minutes') as string)
   const passing_score = parseInt(formData.get('passing_score') as string)
   
-  // 🛠️ FIXED: getAll ব্যবহার করে সবগুলো agent_id রিসিভ করা হচ্ছে
   const agent_ids = formData.getAll('agent_ids') as string[]
   const question_ids = formData.getAll('question_ids') as string[]
-
-  // যদি getAll কাজ না করে, তবে JSON parse করে দেখতে পারেন (যদি ফ্রন্টএন্ড থেকে JSON হিসেবে পাঠানো হয়)
-  // const agent_ids_string = formData.get('agent_ids') as string
-  // const agent_ids = agent_ids_string ? JSON.parse(agent_ids_string) : []
 
   if (!agent_ids || agent_ids.length === 0) {
     return redirect('/super-admin/evaluations?error=Please select at least one agent.')
@@ -30,6 +27,12 @@ export async function createEvaluation(formData: FormData) {
   if (question_ids.length === 0) {
     return redirect('/super-admin/evaluations?error=Please select at least one question.')
   }
+
+  const supabaseAdmin = createAdminClient()
+
+  // 🆕 যে কুইজ অ্যাসাইন করছে (QA/Admin) তার নাম বের করা হচ্ছে
+  const { data: assignerProfile } = await supabaseAdmin.from('profiles').select('full_name').eq('id', user.id).single()
+  const assignerName = assignerProfile?.full_name || 'QA Admin'
 
   const evaluation_id = `EVL-${Date.now().toString().slice(-6)}`
 
@@ -41,7 +44,7 @@ export async function createEvaluation(formData: FormData) {
 
   if (evalError) return redirect(`/super-admin/evaluations?error=${evalError.message}`)
 
-  // ২. সিলেক্ট করা প্রত্যেক এজেন্টের জন্য লুপ চালিয়ে এক্সাম অ্যাসাইন করা
+  // ২. সিলেক্ট করা প্রত্যেক এজেন্টের জন্য লুপ চালিয়ে এক্সাম অ্যাসাইন এবং মেইল পাঠানো
   for (const agent_id of agent_ids) {
     const attempt_id = `ATT-${Math.floor(1000 + Math.random() * 9000)}`
     
@@ -54,14 +57,34 @@ export async function createEvaluation(formData: FormData) {
     })
 
     if (!attemptError) {
+      // 🆕 এজেন্টের ইমেইল ও নাম বের করা হচ্ছে
+      const { data: agentProfile } = await supabaseAdmin.from('profiles').select('email, full_name').eq('id', agent_id).single()
+
+      // পুশ নোটিফিকেশন পাঠানো
       try {
         await sendPushNotification(
           agent_id, 
           'New Exam Assigned 📝', 
-          `QA has assigned a new exam (${title}) for you. Please check your dashboard.`
+          `${assignerName} has assigned a new exam (${title}) for you.`
         )
       } catch (notifyError) {
         console.error('Notification failed for agent:', agent_id)
+      }
+
+      // 🆕 ডিজিটাল ইমেইল টেমপ্লেট পাঠানো
+      if (agentProfile?.email) {
+        try {
+          await sendQuizAssignedEmail(
+            agentProfile.email,
+            agentProfile.full_name || 'Agent',
+            title,
+            duration_minutes,
+            passing_score,
+            assignerName
+          )
+        } catch (emailError) {
+          console.error('Email failed for agent:', agent_id)
+        }
       }
     }
   }
@@ -69,5 +92,5 @@ export async function createEvaluation(formData: FormData) {
   revalidatePath('/super-admin/evaluations')
   revalidatePath('/super-admin/dashboard') 
   
-  redirect('/super-admin/evaluations?success=Evaluation assigned successfully to selected agents!')
+  redirect('/super-admin/evaluations?success=Evaluation assigned and emails sent successfully!')
 }
