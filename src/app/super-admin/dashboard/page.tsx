@@ -18,7 +18,7 @@ export default async function SuperAdminDashboard({
   if (profile?.role !== 'super_admin') redirect('/login')
 
   // 1. Default to Today's Date (Bangladesh Time)
-  const todayDate = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Dhaka' }) // Gives YYYY-MM-DD
+  const todayDate = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Dhaka' }) 
   const from = searchParams.from !== undefined ? searchParams.from : todayDate
   const to = searchParams.to !== undefined ? searchParams.to : todayDate
   
@@ -118,7 +118,7 @@ export default async function SuperAdminDashboard({
           </form>
         </header>
 
-        {/* 🆕 Report Buttons Section */}
+        {/* 🆕 Report Buttons Section - এখানে কল করা হয়েছে */}
         <ReportButtons />
 
         <div className="flex flex-wrap items-center gap-4">
@@ -175,7 +175,6 @@ export default async function SuperAdminDashboard({
           <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <h2 className="text-lg font-semibold text-gray-900 font-poppins">Assignment & Review Tracking</h2>
             
-            {/* 🔔 Bulk Reminder Button */}
             <form action={async () => {
               'use server'
               await sendBulkReminder(profile?.role === 'super_admin' ? undefined : user.id)
@@ -222,7 +221,6 @@ export default async function SuperAdminDashboard({
                     
                     <td className="px-6 py-4 text-right flex justify-end gap-2 items-center">
                       
-                      {/* 🔔 Individual Reminder Button */}
                       {row.status === 'ASSIGNED' && (
                         <form action={async () => {
                           'use server'
@@ -234,7 +232,6 @@ export default async function SuperAdminDashboard({
                         </form>
                       )}
 
-                      {/* 🛠️ Dynamic Live View logic */}
                       <Link 
                         href={row.status === 'ASSIGNED' ? `/agent/evaluation/${row.attempt_id}` : row.status === 'UNDER_QA_REVIEW' ? `/qa/review/${row.attempt_id}` : `/agent/result/${row.attempt_id}`}
                         className="text-[10px] font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded hover:bg-blue-100 transition-colors uppercase tracking-wider"
