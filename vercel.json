@@ -7,10 +7,6 @@
     {
       "path": "/api/reports/weekly",
       "schedule": "0 18 * * 5"
-    },
-    {
-      "path": "/api/cron/reminders",
-      "schedule": "0 4,6,8,10,12 * * 0-4"
     }
   ]
 }
