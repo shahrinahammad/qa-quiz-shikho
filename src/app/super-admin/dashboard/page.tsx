@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { deleteEvaluationAttempt, sendIndividualReminder, sendBulkReminder } from './actions'
-import ReportButtons from '@/components/ReportButtons' // 🆕 Report Buttons Import করা হলো
+import ReportButtons from '@/components/ReportButtons'
 
 export default async function SuperAdminDashboard({
   searchParams
@@ -17,7 +17,6 @@ export default async function SuperAdminDashboard({
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'super_admin') redirect('/login')
 
-  // 1. Default to Today's Date (Bangladesh Time)
   const todayDate = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Dhaka' }) 
   const from = searchParams.from !== undefined ? searchParams.from : todayDate
   const to = searchParams.to !== undefined ? searchParams.to : todayDate
@@ -118,7 +117,6 @@ export default async function SuperAdminDashboard({
           </form>
         </header>
 
-        {/* 🆕 Report Buttons Section - এখানে কল করা হয়েছে */}
         <ReportButtons />
 
         <div className="flex flex-wrap items-center gap-4">
