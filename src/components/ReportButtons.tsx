@@ -21,17 +21,17 @@ export default function ReportButtons() {
       <button 
         onClick={() => sendReport('daily')} 
         disabled={loading}
-        className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm hover:bg-blue-700 transition"
+        className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm hover:bg-blue-700 transition disabled:opacity-50"
       >
-        📊 Force Send Daily Report
+        {loading ? 'Sending...' : '📊 Force Send Daily Report'}
       </button>
       
       <button 
         onClick={() => sendReport('weekly')} 
         disabled={loading}
-        className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm hover:bg-purple-700 transition"
+        className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm hover:bg-purple-700 transition disabled:opacity-50"
       >
-        📈 Force Send Weekly Report
+        {loading ? 'Sending...' : '📈 Force Send Weekly Report'}
       </button>
     </div>
   )
