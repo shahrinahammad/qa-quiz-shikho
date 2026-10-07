@@ -6,30 +6,26 @@ export async function GET() {
   try {
     const supabaseAdmin = createAdminClient()
     
-    // ১. নিখুঁতভাবে আজকের শুরু এবং শেষের সময় বের করা
     const now = new Date()
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0)
     const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
 
     const dateString = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
 
-    // ২. ডেটাবেস থেকে সেফলি ডেটা ফেচ করা
+    // 🛠️ FIXED: 'score' এর বদলে 'overall_score' দেওয়া হয়েছে
     const { data: attempts, error } = await supabaseAdmin
       .from('evaluation_attempts')
-      .select('id, status, agent_id, score')
+      .select('id, status, agent_id, overall_score')
       .gte('created_at', startOfDay.toISOString())
       .lte('created_at', endOfDay.toISOString())
 
     if (error) throw new Error(`Database Error: ${error.message}`)
 
-    // ৩. এজেন্টদের নাম আলাদা করে আনা (যাতে জয়েনিং এরর না দেয়)
     const { data: profiles } = await supabaseAdmin.from('profiles').select('id, full_name')
     const profileMap = profiles?.reduce((acc: any, p: any) => ({ ...acc, [p.id]: p.full_name || 'Agent' }), {}) || {}
 
     const safeAttempts = attempts || []
     const totalAssigned = safeAttempts.length
-    
-    // 🛠️ FIXED: 'ASSIGNED' ছাড়া বাকি সবকিছুকেই সাবমিটেড ধরা হবে
     const totalSubmitted = safeAttempts.filter(a => a.status !== 'ASSIGNED').length 
     const pendingExams = totalAssigned - totalSubmitted
 
@@ -41,7 +37,7 @@ export async function GET() {
       agentMap[agentName].assigned += 1
       if (a.status !== 'ASSIGNED') {
         agentMap[agentName].submitted += 1
-        agentMap[agentName].totalScore += (a.score || 0)
+        agentMap[agentName].totalScore += (a.overall_score || 0) // 🛠️ FIXED
       }
     })
 
