@@ -6,7 +6,11 @@ import {
   createUser, resetUserPassword, updateUserRole, deleteUser, createBulkUsers, sendIndividualEmailAction, sendBulkEmailsToAllAction 
 } from './actions' 
 
-export default async function UsersPage({ searchParams }: { searchParams: { error?: string, success?: string, q?: string } }) {
+export default async function UsersPage({ 
+  searchParams 
+}: { 
+  searchParams: { error?: string, success?: string, q?: string, site?: string, tl?: string, qa?: string, status?: string } 
+}) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -14,15 +18,31 @@ export default async function UsersPage({ searchParams }: { searchParams: { erro
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'super_admin') redirect('/dashboard')
 
+  // URL Query Parameters
   const searchQuery = searchParams?.q || ''
+  const siteFilter = searchParams?.site || ''
+  const tlFilter = searchParams?.tl || ''
+  const qaFilter = searchParams?.qa || ''
+  const statusFilter = searchParams?.status || ''
+
   const supabaseAdmin = createAdminClient()
-  
   const { data: allUsers } = await supabaseAdmin.from('profiles').select('*').order('created_at', { ascending: false })
   
-  const users = allUsers?.filter(u => 
-    u.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    u.email?.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  // Extract Unique Values for Dropdowns (Dynamic)
+  const uniqueSites = Array.from(new Set(allUsers?.map(u => u.site).filter(Boolean) as string[]))
+  const uniqueTls = Array.from(new Set(allUsers?.map(u => u.tl_name).filter(Boolean) as string[]))
+  const uniqueQas = Array.from(new Set(allUsers?.map(u => u.qa_name).filter(Boolean) as string[]))
+
+  // Apply Filters
+  const users = allUsers?.filter(u => {
+    const matchSearch = !searchQuery || u.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) || u.email?.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchSite = !siteFilter || u.site === siteFilter
+    const matchTl = !tlFilter || u.tl_name === tlFilter
+    const matchQa = !qaFilter || u.qa_name === qaFilter
+    const matchStatus = !statusFilter || (statusFilter === 'unassigned' ? (!u.site || !u.tl_name || !u.qa_name) : true)
+
+    return matchSearch && matchSite && matchTl && matchQa && matchStatus
+  })
 
   const updateUserInfo = async (formData: FormData) => {
     'use server'
@@ -57,9 +77,9 @@ export default async function UsersPage({ searchParams }: { searchParams: { erro
         {searchParams.success && <div className="p-4 bg-green-50 text-green-700 text-sm rounded-lg font-poppins font-bold">{searchParams.success}</div>}
         {searchParams.error && <div className="p-4 bg-red-50 text-red-700 text-sm rounded-lg font-poppins font-bold">{searchParams.error}</div>}
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
           
-          <div className="lg:col-span-1 space-y-6">
+          <div className="xl:col-span-1 space-y-6">
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-fit">
               <h2 className="text-lg font-semibold text-gray-900 mb-6 font-poppins">Create New User</h2>
               <form action={createUser} className="space-y-4">
@@ -82,48 +102,72 @@ export default async function UsersPage({ searchParams }: { searchParams: { erro
 
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-green-100 h-fit">
               <div className="flex justify-between items-center mb-2">
-                <h2 className="text-lg font-semibold text-green-700 font-poppins">Bulk Create/Update</h2>
+                <h2 className="text-lg font-semibold text-green-700 font-poppins">Bulk Sync</h2>
               </div>
               <div className="flex gap-2 mb-4">
                 <a href="data:text/csv;charset=utf-8,Email,Name,Role,Site,TL Name,QA Name%0Aagent1@shikho.com,John Doe,agent,Dhaka,Mr. TL,Mr. QA" download="shikho_users_template.csv" className="text-[10px] font-bold text-gray-500 hover:text-green-600 hover:underline">
-                  Download Updated Demo CSV
+                  Download Demo CSV
                 </a>
               </div>
               <form action={createBulkUsers} className="space-y-4">
                 <input type="file" name="file" accept=".csv" required className="w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100 cursor-pointer" />
                 <button type="submit" className="w-full bg-green-600 text-white py-2.5 rounded-lg font-poppins font-bold hover:bg-green-700 shadow-sm">
-                  Upload & Sync Users
+                  Upload & Sync
                 </button>
               </form>
             </div>
           </div>
 
-          <div className="lg:col-span-3 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden h-fit">
-            <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <h2 className="text-lg font-semibold text-gray-900 font-poppins">All Users</h2>
+          <div className="xl:col-span-3 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden h-fit">
+            <div className="p-6 border-b border-gray-100 flex flex-col gap-4">
+              <div className="flex justify-between items-center">
+                <h2 className="text-lg font-semibold text-gray-900 font-poppins">All Users <span className="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded ml-2">Total: {users?.length || 0}</span></h2>
+              </div>
               
-              <form method="GET" className="flex w-full md:w-auto gap-2">
-                <input type="text" name="q" defaultValue={searchQuery} placeholder="Search by name or email..." className="w-full md:w-64 px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-shikho-indigo-500 font-poppins" />
-                <button type="submit" className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-bold hover:bg-gray-200 font-poppins">Search</button>
-                {searchQuery && (
-                  <a href="/super-admin/users" className="bg-red-50 text-red-600 px-4 py-2 rounded-lg text-sm font-bold hover:bg-red-100 flex items-center font-poppins">Clear</a>
+              {/* 🔍 Dynamic Filter Form */}
+              <form method="GET" className="flex flex-wrap items-center gap-2">
+                <input type="text" name="q" defaultValue={searchQuery} placeholder="Search name/email..." className="flex-1 min-w-[150px] px-3 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-1 focus:ring-shikho-indigo-500 font-poppins" />
+                
+                <select name="site" defaultValue={siteFilter} className="min-w-[100px] px-3 py-1.5 text-xs border border-gray-300 rounded-lg bg-white font-poppins">
+                  <option value="">All Sites</option>
+                  {uniqueSites.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+
+                <select name="tl" defaultValue={tlFilter} className="min-w-[100px] px-3 py-1.5 text-xs border border-gray-300 rounded-lg bg-white font-poppins">
+                  <option value="">All TLs</option>
+                  {uniqueTls.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+
+                <select name="qa" defaultValue={qaFilter} className="min-w-[100px] px-3 py-1.5 text-xs border border-gray-300 rounded-lg bg-white font-poppins">
+                  <option value="">All QAs</option>
+                  {uniqueQas.map(q => <option key={q} value={q}>{q}</option>)}
+                </select>
+
+                <select name="status" defaultValue={statusFilter} className="min-w-[120px] px-3 py-1.5 text-xs border border-gray-300 rounded-lg bg-white font-poppins">
+                  <option value="">All Status</option>
+                  <option value="unassigned">⚠️ Missing Info</option>
+                </select>
+
+                <button type="submit" className="bg-shikho-indigo-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-shikho-indigo-700 font-poppins">Filter</button>
+                {(searchQuery || siteFilter || tlFilter || qaFilter || statusFilter) && (
+                  <a href="/super-admin/users" className="bg-red-50 text-red-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-100 font-poppins">Clear</a>
                 )}
               </form>
             </div>
 
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
-                <thead className="bg-shikho-indigo-50 text-gray-600 text-xs uppercase tracking-wider font-poppins">
+                <thead className="bg-shikho-indigo-50 text-gray-600 text-[10px] uppercase tracking-wider font-poppins">
                   <tr>
-                    <th className="px-6 py-4 font-medium">Info & Hierarchy</th>
-                    <th className="px-6 py-4 font-medium">Current Role</th>
-                    <th className="px-6 py-4 font-medium">Change Role</th>
-                    <th className="px-6 py-4 font-medium text-right">Actions</th>
+                    <th className="px-6 py-4 font-bold">Info & Hierarchy</th>
+                    <th className="px-6 py-4 font-bold">Current Role</th>
+                    <th className="px-6 py-4 font-bold">Change Role</th>
+                    <th className="px-6 py-4 font-bold text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {users?.length === 0 ? (
-                    <tr><td colSpan={4} className="text-center py-8 text-gray-500 text-sm font-poppins">No users found.</td></tr>
+                    <tr><td colSpan={4} className="text-center py-8 text-gray-500 text-sm font-poppins">No users found matching your filters.</td></tr>
                   ) : (
                     users?.map((u) => (
                       <tr key={u.id} className="hover:bg-gray-50 transition-colors">
@@ -131,13 +175,13 @@ export default async function UsersPage({ searchParams }: { searchParams: { erro
                           <form action={updateUserInfo} className="flex gap-4 items-start">
                             <input type="hidden" name="userId" value={u.id} />
                             <div className="flex flex-col gap-1.5 w-40">
-                              <input type="text" name="newName" defaultValue={u.full_name} className="px-2 py-1 text-xs font-bold text-gray-900 border border-gray-200 rounded focus:ring-2 focus:ring-shikho-indigo-500 font-poppins" placeholder="Name" />
+                              <input type="text" name="newName" defaultValue={u.full_name} className="px-2 py-1 text-xs font-bold text-gray-900 border border-gray-200 rounded focus:ring-1 focus:ring-shikho-indigo-500 font-poppins" placeholder="Name" />
                               <div className="text-[10px] text-gray-500 font-poppins px-1 break-all">{u.email}</div>
                             </div>
                             <div className="flex flex-col gap-1.5 w-32">
-                              <input type="text" name="site" defaultValue={u.site || ''} className="px-2 py-1 text-[10px] text-gray-700 border border-gray-200 rounded" placeholder="Site (e.g. Dhaka)" />
-                              <input type="text" name="tlName" defaultValue={u.tl_name || ''} className="px-2 py-1 text-[10px] text-gray-700 border border-gray-200 rounded" placeholder="TL Name" />
-                              <input type="text" name="qaName" defaultValue={u.qa_name || ''} className="px-2 py-1 text-[10px] text-gray-700 border border-gray-200 rounded" placeholder="QA Name" />
+                              <input type="text" name="site" defaultValue={u.site || ''} className={`px-2 py-1 text-[10px] border rounded focus:ring-1 focus:ring-shikho-indigo-500 ${!u.site ? 'border-orange-300 bg-orange-50' : 'border-gray-200'}`} placeholder="Site (e.g. Dhaka)" />
+                              <input type="text" name="tlName" defaultValue={u.tl_name || ''} className={`px-2 py-1 text-[10px] border rounded focus:ring-1 focus:ring-shikho-indigo-500 ${!u.tl_name ? 'border-orange-300 bg-orange-50' : 'border-gray-200'}`} placeholder="TL Name" />
+                              <input type="text" name="qaName" defaultValue={u.qa_name || ''} className={`px-2 py-1 text-[10px] border rounded focus:ring-1 focus:ring-shikho-indigo-500 ${!u.qa_name ? 'border-orange-300 bg-orange-50' : 'border-gray-200'}`} placeholder="QA Name" />
                             </div>
                             <button type="submit" className="text-[10px] font-bold bg-green-50 border border-green-200 text-green-600 px-3 py-1.5 rounded hover:bg-green-100 transition-colors mt-1">Save</button>
                           </form>
