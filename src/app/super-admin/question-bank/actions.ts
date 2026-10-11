@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function createQuestion(formData: FormData) {
   const supabase = createClient()
@@ -10,15 +11,14 @@ export async function createQuestion(formData: FormData) {
 
   if (!user) return redirect('/login')
 
-  // ফর্ম থেকে ডাটা নেওয়া
   const type = formData.get('type') as string
   const competency = formData.get('competency') as string
   const difficulty = formData.get('difficulty') as string
   const content = formData.get('content') as string
   const expected_answer = formData.get('expected_answer') as string
+  const campaign = formData.get('campaign') as string
   const marks = parseInt(formData.get('marks') as string)
 
-  // একটি ইউনিক Question ID তৈরি করা (যেমন: Q-CRM-8374)
   const randomNum = Math.floor(1000 + Math.random() * 9000)
   const question_id = `Q-${competency.substring(0, 3).toUpperCase()}-${randomNum}`
 
@@ -29,6 +29,7 @@ export async function createQuestion(formData: FormData) {
     difficulty,
     content,
     expected_answer,
+    campaign: campaign || null,
     marks,
     created_by: user.id
   })
@@ -40,7 +41,6 @@ export async function createQuestion(formData: FormData) {
   revalidatePath('/super-admin/question-bank')
   redirect('/super-admin/question-bank?success=Question added successfully!')
 }
-import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function deleteQuestion(formData: FormData) {
   const id = formData.get('id') as string
@@ -50,4 +50,17 @@ export async function deleteQuestion(formData: FormData) {
   
   revalidatePath('/super-admin/question-bank')
   redirect('/super-admin/question-bank?success=Question deleted successfully!')
+}
+
+export async function updateQuestionCampaign(formData: FormData) {
+  const id = formData.get('id') as string
+  const campaign = formData.get('campaign') as string
+  const supabaseAdmin = createAdminClient()
+  
+  const { error } = await supabaseAdmin.from('questions').update({ campaign: campaign || null }).eq('id', id)
+  
+  if (error) return redirect(`/super-admin/question-bank?error=${error.message}`)
+  
+  revalidatePath('/super-admin/question-bank')
+  redirect('/super-admin/question-bank?success=Campaign updated successfully!')
 }
