@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { createQuestion, deleteQuestion } from './actions' // এখানে deleteQuestion ইম্পোর্ট করা হয়েছে
+import { createQuestion, deleteQuestion, updateQuestionCampaign } from './actions' 
 
 export default async function QuestionBankPage({
   searchParams
@@ -21,13 +21,12 @@ export default async function QuestionBankPage({
         <header className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
           <div>
             <h1 className="text-2xl font-bold text-shikho-indigo-600 font-poppins">Question Bank</h1>
-            <p className="text-gray-500 font-poppins text-sm mt-1">Manage and create questions for evaluations.</p>
+            <p className="text-gray-500 font-poppins text-sm mt-1">Manage, categorize by campaign, and create questions.</p>
           </div>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
-          {/* Add Question Form */}
           <div className="lg:col-span-1 bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-fit">
             <h2 className="text-lg font-semibold text-gray-900 mb-6 font-poppins">Add New Question</h2>
             
@@ -81,6 +80,11 @@ export default async function QuestionBankPage({
               </div>
 
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1 font-poppins">Campaign (Optional)</label>
+                <input type="text" name="campaign" placeholder="e.g., October Knowledge Test" className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-shikho-indigo-500 text-sm" />
+              </div>
+
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1 font-poppins">Question Content</label>
                 <textarea name="content" required rows={3} className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-shikho-indigo-500 text-sm font-bengali" placeholder="Write your question here... (বাংলা বা English)"></textarea>
               </div>
@@ -96,7 +100,6 @@ export default async function QuestionBankPage({
             </form>
           </div>
 
-          {/* Question Library Table */}
           <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
               <h2 className="text-lg font-semibold text-gray-900 font-poppins">Question Library</h2>
@@ -109,17 +112,16 @@ export default async function QuestionBankPage({
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-shikho-indigo-50 text-gray-600 text-xs uppercase tracking-wider font-poppins">
-                    <th className="px-6 py-4 font-medium">ID / Type</th>
+                    <th className="px-6 py-4 font-medium">Details & Campaign</th>
                     <th className="px-6 py-4 font-medium">Question</th>
                     <th className="px-6 py-4 font-medium">Competency</th>
-                    <th className="px-6 py-4 font-medium">Marks</th>
                     <th className="px-6 py-4 font-medium text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {questions?.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-6 py-8 text-center text-gray-500 text-sm">
+                      <td colSpan={4} className="px-6 py-8 text-center text-gray-500 text-sm">
                         No questions added yet.
                       </td>
                     </tr>
@@ -127,24 +129,27 @@ export default async function QuestionBankPage({
                     questions?.map((q) => (
                       <tr key={q.id} className="hover:bg-gray-50 transition-colors">
                         <td className="px-6 py-4">
-                          <div className="text-sm font-medium text-gray-900">{q.question_id}</div>
+                          <div className="text-sm font-bold text-gray-900">{q.question_id}</div>
                           <div className="text-xs text-shikho-magenta-500 mt-1 font-semibold">{q.type}</div>
+                          
+                          <form action={updateQuestionCampaign} className="mt-3 flex flex-col gap-1">
+                            <input type="hidden" name="id" value={q.id} />
+                            <input type="text" name="campaign" defaultValue={q.campaign || ''} placeholder="Add Campaign" className="w-32 px-2 py-1 text-[10px] border border-gray-300 rounded focus:ring-1 focus:ring-purple-500" />
+                            <button type="submit" className="w-fit text-[10px] font-bold text-purple-600 bg-purple-50 px-2 py-1 rounded hover:bg-purple-100 border border-purple-200">Update</button>
+                          </form>
                         </td>
                         <td className="px-6 py-4">
-                          <p className="text-sm text-gray-700 font-bengali line-clamp-2">{q.content}</p>
+                          <p className="text-sm text-gray-700 font-bengali line-clamp-3">{q.content}</p>
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-500">
                           {q.competency}
                           <div className="text-xs text-gray-400 mt-1">{q.difficulty}</div>
-                        </td>
-                        <td className="px-6 py-4 text-sm font-bold text-gray-900">
-                          {q.marks}
+                          <div className="text-xs text-gray-900 font-bold mt-1">Marks: {q.marks}</div>
                         </td>
                         <td className="px-6 py-4 text-right">
                           <form action={deleteQuestion}>
                             <input type="hidden" name="id" value={q.id} />
-                            {/* onClick ইভেন্ট মুছে দেওয়া হয়েছে */}
-                            <button type="submit" className="text-xs text-red-600 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors">
+                            <button type="submit" className="text-xs font-bold text-red-600 bg-red-50 border border-red-100 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors">
                               Delete
                             </button>
                           </form>
