@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { deleteEvaluationAttempt, sendIndividualReminder, sendBulkReminder } from './actions'
 import ReportButtons from '@/components/ReportButtons'
+import ExportCSV from '@/components/ExportCSV' // 🆕 Export CSV Component
 
 export default async function SuperAdminDashboard({
   searchParams
@@ -25,6 +26,7 @@ export default async function SuperAdminDashboard({
   
   let query = supabaseAdmin
     .from('evaluation_attempts')
+    // Note: 'campaign' will be dynamically read after the DB update.
     .select(`*, evaluations!inner(title, passing_score, created_by), agent:profiles!evaluation_attempts_agent_id_fkey(full_name), qa:profiles!evaluation_attempts_qa_id_fkey(full_name)`)
     .order('created_at', { ascending: false })
 
@@ -40,21 +42,68 @@ export default async function SuperAdminDashboard({
   const agentCompleted = reports?.filter(r => r.status !== 'ASSIGNED').length || 0
   const qaReviewed = reports?.filter(r => r.status === 'PUBLISHED').length || 0
 
+  // 📊 1. QA Performance, Pass/Fail & Raw Data Prep
   const qaPerformance: Record<string, any> = {}
-  reports?.forEach((r: any) => {
-    const assignerId = r.evaluations?.created_by;
-    const assignerName = profileMap[assignerId] || 'Admin / Unknown';
+  let totalPassed = 0
+  let totalFailed = 0
 
-    if (!qaPerformance[assignerId]) {
-      qaPerformance[assignerId] = { name: assignerName, totalAssigned: 0, totalSubmitted: 0, totalReviewed: 0, totalRecheck: 0 }
-    }
+  const enrichedReports = reports?.map((r: any) => {
+    const assignerId = r.evaluations?.created_by
+    const assignerName = profileMap[assignerId] || 'Admin / Unknown'
+    r.qaName = assignerName // Storing for CSV export
 
+    // QA Stats
+    if (!qaPerformance[assignerId]) qaPerformance[assignerId] = { name: assignerName, totalAssigned: 0, totalSubmitted: 0, totalReviewed: 0, totalRecheck: 0 }
     qaPerformance[assignerId].totalAssigned += 1
     if (r.status !== 'ASSIGNED') qaPerformance[assignerId].totalSubmitted += 1
     if (r.status === 'PUBLISHED') qaPerformance[assignerId].totalReviewed += 1
     if (r.status === 'RECHECK_REQUESTED') qaPerformance[assignerId].totalRecheck += 1
-  })
+
+    // Pass/Fail Logic
+    if (r.overall_score !== null && r.evaluations?.passing_score !== null) {
+      if (r.overall_score >= r.evaluations.passing_score) totalPassed++
+      else totalFailed++
+    }
+
+    return r
+  }) || []
+  
   const qaReportArray = Object.values(qaPerformance)
+
+  // 📊 2. Agent-wise Analytics
+  const agentStats: Record<string, any> = {}
+  enrichedReports.forEach((r: any) => {
+    const agentName = r.agent?.full_name || 'Unknown Agent'
+    if (!agentStats[agentName]) {
+      agentStats[agentName] = { name: agentName, assigned: 0, submitted: 0, passed: 0, failed: 0, sumScore: 0 }
+    }
+    agentStats[agentName].assigned += 1
+    if (r.status !== 'ASSIGNED') agentStats[agentName].submitted += 1
+    if (r.overall_score !== null && r.evaluations?.passing_score !== null) {
+      agentStats[agentName].sumScore += r.overall_score
+      if (r.overall_score >= r.evaluations.passing_score) agentStats[agentName].passed += 1
+      else agentStats[agentName].failed += 1
+    }
+  })
+  const agentReportArray = Object.values(agentStats)
+
+  // 📊 3. Campaign-wise Analytics (Mocked for now until DB update)
+  const campaignStats: Record<string, any> = {}
+  enrichedReports.forEach((r: any) => {
+    const campaignName = r.evaluations?.campaign || 'General (Uncategorized)'
+    if (!campaignStats[campaignName]) {
+      campaignStats[campaignName] = { name: campaignName, assigned: 0, submitted: 0, passed: 0, failed: 0 }
+    }
+    campaignStats[campaignName].assigned += 1
+    if (r.status !== 'ASSIGNED') campaignStats[campaignName].submitted += 1
+    if (r.overall_score !== null && r.evaluations?.passing_score !== null) {
+      if (r.overall_score >= r.evaluations.passing_score) campaignStats[campaignName].passed += 1
+      else campaignStats[campaignName].failed += 1
+    }
+  })
+  const campaignReportArray = Object.values(campaignStats)
+
+  const passRate = (totalPassed + totalFailed) > 0 ? Math.round((totalPassed / (totalPassed + totalFailed)) * 100) : 0
 
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -97,6 +146,7 @@ export default async function SuperAdminDashboard({
     <div className="min-h-screen bg-shikho-canvas p-8">
       <div className="max-w-7xl mx-auto space-y-8">
         
+        {/* Header & Filter */}
         <header className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h1 className="text-2xl font-bold text-shikho-indigo-600 font-poppins">Super Admin Dashboard</h1>
@@ -119,48 +169,142 @@ export default async function SuperAdminDashboard({
 
         <ReportButtons />
 
+        {/* Action Links & CSV Download Button */}
         <div className="flex flex-wrap items-center gap-4">
-          <Link href="/super-admin/impact-report" className="flex items-center gap-2 bg-gradient-to-r from-shikho-indigo-600 to-shikho-magenta-500 text-white px-6 py-3 rounded-xl font-bold hover:shadow-lg transition-all shadow-sm text-sm font-poppins">
-            📸 View Visual Impact Report (Image Format)
+          <ExportCSV data={enrichedReports} filename={`QA_Report_${from}_to_${to}`} />
+          
+          <Link href="/super-admin/impact-report" className="flex items-center gap-2 bg-gradient-to-r from-shikho-indigo-600 to-shikho-magenta-500 text-white px-5 py-3 rounded-xl font-bold hover:shadow-lg transition-all shadow-sm text-sm font-poppins">
+            📸 View Visual Impact Report
           </Link>
           <a href={dailyWaLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 bg-[#25D366] text-white px-5 py-3 rounded-xl font-bold hover:bg-[#1da851] transition-colors shadow-sm text-sm font-poppins">
-            💬 Share Daily (WhatsApp)
+            💬 Share Daily
           </a>
           <a href={weeklyWaLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 bg-[#128C7E] text-white px-5 py-3 rounded-xl font-bold hover:bg-[#0c6b5e] transition-colors shadow-sm text-sm font-poppins">
-            📊 Share Weekly (WhatsApp)
+            📊 Share Weekly
           </a>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* 1. Overall Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100"><p className="text-sm text-gray-500 font-bold">Total Assigned</p><p className="text-3xl font-black text-gray-900">{total}</p></div>
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100"><p className="text-sm text-gray-500 font-bold">Agent Submitted</p><p className="text-3xl font-black text-blue-600">{agentCompleted}</p></div>
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100"><p className="text-sm text-gray-500 font-bold">QA Reviewed</p><p className="text-3xl font-black text-green-600">{qaReviewed}</p></div>
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100"><p className="text-sm text-gray-500 font-bold">QA Reviewed</p><p className="text-3xl font-black text-emerald-600">{qaReviewed}</p></div>
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-orange-100 bg-orange-50/30"><p className="text-sm text-orange-600 font-bold">Pass Rate</p><p className="text-3xl font-black text-orange-600">{passRate}%</p></div>
         </div>
 
-        {qaReportArray.length > 0 && (
-          <div className="bg-white rounded-2xl shadow-sm border border-shikho-magenta-100 overflow-hidden">
-            <div className="p-6 border-b border-gray-100 bg-shikho-magenta-50/30">
-              <h2 className="text-lg font-semibold text-shikho-magenta-600 font-poppins">QA Performance Summary</h2>
+        {/* 2. Pass/Fail Summary Card */}
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-emerald-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900 font-poppins">Performance Overview</h2>
+            <p className="text-sm text-gray-500">Global pass/fail count based on target passing score</p>
+          </div>
+          <div className="flex gap-8">
+            <div className="text-center">
+              <p className="text-sm font-bold text-gray-500 uppercase">Total Passed</p>
+              <p className="text-3xl font-black text-emerald-600">{totalPassed}</p>
             </div>
-            <div className="overflow-x-auto">
+            <div className="text-center">
+              <p className="text-sm font-bold text-gray-500 uppercase">Total Failed</p>
+              <p className="text-3xl font-black text-red-500">{totalFailed}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* 3. QA Performance Summary */}
+          {qaReportArray.length > 0 && (
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="p-5 border-b border-gray-100 bg-gray-50">
+                <h2 className="text-md font-semibold text-gray-900 font-poppins">QA Performance Summary</h2>
+              </div>
+              <div className="overflow-x-auto max-h-[400px]">
+                <table className="w-full text-left">
+                  <thead className="bg-white text-gray-500 text-[10px] uppercase font-bold sticky top-0 shadow-sm">
+                    <tr>
+                      <th className="px-4 py-3">QA Name</th>
+                      <th className="px-4 py-3 text-center">Assigned</th>
+                      <th className="px-4 py-3 text-center">Submitted</th>
+                      <th className="px-4 py-3 text-center">Reviewed</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {qaReportArray.map((qa: any, idx: number) => (
+                      <tr key={idx} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 text-xs font-bold text-gray-900">{qa.name}</td>
+                        <td className="px-4 py-3 text-xs font-bold text-gray-600 text-center">{qa.totalAssigned}</td>
+                        <td className="px-4 py-3 text-xs text-blue-600 font-bold text-center">{qa.totalSubmitted}</td>
+                        <td className="px-4 py-3 text-xs text-emerald-600 font-bold text-center">{qa.totalReviewed}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* 4. Campaign-wise Analytics */}
+          {campaignReportArray.length > 0 && (
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="p-5 border-b border-gray-100 bg-gray-50">
+                <h2 className="text-md font-semibold text-gray-900 font-poppins">Campaign-wise Report</h2>
+              </div>
+              <div className="overflow-x-auto max-h-[400px]">
+                <table className="w-full text-left">
+                  <thead className="bg-white text-gray-500 text-[10px] uppercase font-bold sticky top-0 shadow-sm">
+                    <tr>
+                      <th className="px-4 py-3">Campaign (Monthly Event)</th>
+                      <th className="px-4 py-3 text-center">Assigned</th>
+                      <th className="px-4 py-3 text-center">Submitted</th>
+                      <th className="px-4 py-3 text-center">Passed</th>
+                      <th className="px-4 py-3 text-center">Failed</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {campaignReportArray.map((camp: any, idx: number) => (
+                      <tr key={idx} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 text-xs font-bold text-shikho-indigo-600">{camp.name}</td>
+                        <td className="px-4 py-3 text-xs font-bold text-gray-600 text-center">{camp.assigned}</td>
+                        <td className="px-4 py-3 text-xs text-blue-600 font-bold text-center">{camp.submitted}</td>
+                        <td className="px-4 py-3 text-xs text-emerald-600 font-bold text-center">{camp.passed}</td>
+                        <td className="px-4 py-3 text-xs text-red-500 font-bold text-center">{camp.failed}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 5. Agent-wise Analytics */}
+        {agentReportArray.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="p-5 border-b border-gray-100 bg-blue-50/50">
+              <h2 className="text-md font-semibold text-blue-900 font-poppins">Agent-wise Performance Report</h2>
+            </div>
+            <div className="overflow-x-auto max-h-[400px]">
               <table className="w-full text-left">
-                <thead className="bg-gray-50 text-gray-600 text-[11px] uppercase font-bold font-poppins tracking-wider">
+                <thead className="bg-white text-gray-500 text-[10px] uppercase font-bold sticky top-0 shadow-sm">
                   <tr>
-                    <th className="px-6 py-4">QA Name</th>
-                    <th className="px-6 py-4 text-center">Total Assign</th>
-                    <th className="px-6 py-4 text-center">Agent Submitted</th>
-                    <th className="px-6 py-4 text-center">QA Reviewed</th>
-                    <th className="px-6 py-4 text-center">Re-check Issues</th>
+                    <th className="px-6 py-4">Agent Name</th>
+                    <th className="px-6 py-4 text-center">Assigned</th>
+                    <th className="px-6 py-4 text-center">Submitted</th>
+                    <th className="px-6 py-4 text-center">Passed</th>
+                    <th className="px-6 py-4 text-center">Failed</th>
+                    <th className="px-6 py-4 text-center">Avg. Score</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {qaReportArray.map((qa: any, idx: number) => (
+                  {agentReportArray.map((ag: any, idx: number) => (
                     <tr key={idx} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 text-sm font-bold text-gray-900">{qa.name}</td>
-                      <td className="px-6 py-4 text-sm font-bold text-gray-600 text-center">{qa.totalAssigned}</td>
-                      <td className="px-6 py-4 text-sm text-blue-600 font-bold text-center">{qa.totalSubmitted}</td>
-                      <td className="px-6 py-4 text-sm text-green-600 font-bold text-center">{qa.totalReviewed}</td>
-                      <td className="px-6 py-4 text-sm text-orange-600 font-bold text-center">{qa.totalRecheck}</td>
+                      <td className="px-6 py-4 text-sm font-bold text-gray-900">{ag.name}</td>
+                      <td className="px-6 py-4 text-sm font-bold text-gray-600 text-center">{ag.assigned}</td>
+                      <td className="px-6 py-4 text-sm text-blue-600 font-bold text-center">{ag.submitted}</td>
+                      <td className="px-6 py-4 text-sm text-emerald-600 font-bold text-center">{ag.passed}</td>
+                      <td className="px-6 py-4 text-sm text-red-500 font-bold text-center">{ag.failed}</td>
+                      <td className="px-6 py-4 text-sm text-shikho-indigo-600 font-bold text-center">
+                        {ag.passed + ag.failed > 0 ? Math.round(ag.sumScore / (ag.passed + ag.failed)) : 0}%
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -169,6 +313,7 @@ export default async function SuperAdminDashboard({
           </div>
         )}
 
+        {/* 6. Assignment & Review Tracking (Detailed List) */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <h2 className="text-lg font-semibold text-gray-900 font-poppins">Assignment & Review Tracking</h2>
@@ -253,4 +398,3 @@ export default async function SuperAdminDashboard({
     </div>
   )
 }
-
