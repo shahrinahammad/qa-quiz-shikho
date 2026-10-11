@@ -47,7 +47,7 @@ export async function sendBulkReminder(qaId?: string) {
 
   if (pendingExams) {
     for (const item of pendingExams) {
-      const exam: any = item // 🛠️ Bulletproof TypeScript bypass
+      const exam: any = item 
       
       const examTitle = Array.isArray(exam.evaluations) 
         ? exam.evaluations[0]?.title 
@@ -67,4 +67,48 @@ export async function sendBulkReminder(qaId?: string) {
     }
   }
 }
-// trigger new deploy
+
+// 🆕 Auto Reassign Logic
+export async function autoReassignQuiz(formData: FormData) {
+  const attempt_id = formData.get('attempt_id') as string
+  const agent_id = formData.get('agent_id') as string
+  const campaign = formData.get('campaign') as string
+  const qa_id = formData.get('qa_id') as string
+  const original_eval_id = formData.get('eval_id') as string
+
+  const supabaseAdmin = createAdminClient()
+
+  // ১. একই ক্যাম্পেইনের সব ইভ্যালুয়েশন বের করা
+  const { data: campaignEvals } = await supabaseAdmin
+    .from('evaluations')
+    .select('id')
+    .eq('campaign', campaign || 'General')
+
+  // ২. এজেন্ট ইতিমধ্যে কোন কোন পরীক্ষা দিয়েছে তা বের করা
+  const { data: agentAttempts } = await supabaseAdmin
+    .from('evaluation_attempts')
+    .select('evaluation_id')
+    .eq('agent_id', agent_id)
+
+  const attemptedEvalIds = agentAttempts?.map(a => a.evaluation_id) || []
+  
+  // ৩. নতুন আনরিড প্রশ্ন ফিল্টার করা
+  const availableEvals = campaignEvals?.filter(e => !attemptedEvalIds.includes(e.id)) || []
+
+  // ৪. যদি নতুন প্রশ্ন থাকে সেটি দিবে, না থাকলে পুরোটাই আবার দিবে
+  const newEvalId = availableEvals.length > 0 ? availableEvals[0].id : original_eval_id
+
+  const newAttemptId = `ATT-${Math.random().toString(36).substring(2, 10).toUpperCase()}`
+
+  await supabaseAdmin.from('evaluation_attempts').insert({
+    attempt_id: newAttemptId,
+    evaluation_id: newEvalId,
+    agent_id: agent_id,
+    qa_id: qa_id,
+    status: 'ASSIGNED',
+    attempt_type: 'Reassigned',
+    parent_attempt_id: attempt_id
+  })
+
+  revalidatePath('/super-admin/dashboard')
+}
