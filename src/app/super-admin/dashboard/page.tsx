@@ -51,7 +51,7 @@ export default async function SuperAdminDashboard({
     const assignerName = profileMap[assignerId] || 'Admin / Unknown'
     r.qaName = assignerName 
     
-    // 🛠️ 104% Error Fix: Cap Score at 100%
+    // 🛠️ Cap Score at 100%
     if (r.overall_score !== null && r.overall_score > 100) r.overall_score = 100 
 
     // QA Stats
@@ -94,7 +94,6 @@ export default async function SuperAdminDashboard({
   const qaReportArray = Object.values(qaPerformance)
   const agentReportArray = Object.values(agentStats)
   const campaignReportArray = Object.values(campaignStats)
-  const passRate = (totalPassed + totalFailed) > 0 ? Math.round((totalPassed / (totalPassed + totalFailed)) * 100) : 0
 
   return (
     <div className="min-h-screen bg-shikho-canvas p-8">
@@ -121,29 +120,27 @@ export default async function SuperAdminDashboard({
           <Link href="/super-admin/impact-report" className="flex items-center gap-2 bg-gradient-to-r from-shikho-indigo-600 to-shikho-magenta-500 text-white px-5 py-3 rounded-xl font-bold hover:shadow-lg shadow-sm text-sm font-poppins">📸 View Visual Impact Report</Link>
         </div>
 
-        {/* 4 Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100"><p className="text-sm text-gray-500 font-bold">Total Assigned</p><p className="text-3xl font-black text-gray-900">{total}</p></div>
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100"><p className="text-sm text-gray-500 font-bold">Agent Submitted</p><p className="text-3xl font-black text-blue-600">{agentCompleted}</p></div>
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100"><p className="text-sm text-gray-500 font-bold">QA Reviewed</p><p className="text-3xl font-black text-emerald-600">{qaReviewed}</p></div>
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-orange-100 bg-orange-50/30"><p className="text-sm text-orange-600 font-bold">Pass Rate</p><p className="text-3xl font-black text-orange-600">{passRate}%</p></div>
-        </div>
-
-        {/* 🎯 Performance Overview (Pass/Fail) */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-emerald-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-bold text-gray-900 font-poppins">Performance Overview</h2>
-            <p className="text-sm text-gray-500">Global pass/fail count based on target passing score</p>
+        {/* 🎯 5 Summary Cards with Pass & Fail */}
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+            <p className="text-sm text-gray-500 font-bold">Total Assigned</p>
+            <p className="text-3xl font-black text-gray-900">{total}</p>
           </div>
-          <div className="flex gap-8">
-            <div className="text-center">
-              <p className="text-sm font-bold text-gray-500 uppercase">Total Passed</p>
-              <p className="text-3xl font-black text-emerald-600">{totalPassed}</p>
-            </div>
-            <div className="text-center">
-              <p className="text-sm font-bold text-gray-500 uppercase">Total Failed</p>
-              <p className="text-3xl font-black text-red-500">{totalFailed}</p>
-            </div>
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+            <p className="text-sm text-gray-500 font-bold">Agent Submitted</p>
+            <p className="text-3xl font-black text-blue-600">{agentCompleted}</p>
+          </div>
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+            <p className="text-sm text-gray-500 font-bold">QA Reviewed</p>
+            <p className="text-3xl font-black text-emerald-600">{qaReviewed}</p>
+          </div>
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-emerald-200 bg-emerald-50/50">
+            <p className="text-sm text-emerald-700 font-bold">Total Passed</p>
+            <p className="text-3xl font-black text-emerald-600">{totalPassed}</p>
+          </div>
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-red-200 bg-red-50/50">
+            <p className="text-sm text-red-700 font-bold">Total Failed</p>
+            <p className="text-3xl font-black text-red-600">{totalFailed}</p>
           </div>
         </div>
 
