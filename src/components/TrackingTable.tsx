@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
-import { deleteEvaluationAttempt, sendIndividualReminder, sendBulkReminder } from '@/app/super-admin/dashboard/actions'
+import { deleteEvaluationAttempt, sendIndividualReminder, sendBulkReminder, autoReassignQuiz } from '@/app/super-admin/dashboard/actions'
 
 export default function TrackingTable({ reports, profileMap, userRole, userId }: { reports: any[], profileMap: any, userRole: string, userId: string }) {
   const [search, setSearch] = useState({ date: '', title: '', campaign: '', qa: '', agent: '', status: '', result: '' })
@@ -86,7 +86,21 @@ export default function TrackingTable({ reports, profileMap, userRole, userId }:
                     {score === null ? <span className="text-gray-400">-</span> : isPass ? <span className="text-emerald-600">{score}% (Pass)</span> : <span className="text-red-500">{score}% (Fail)</span>}
                   </td>
                   
-                  <td className="px-4 py-4 text-right flex justify-end gap-1.5 items-center">
+                  <td className="px-4 py-4 text-right flex justify-end gap-1.5 items-center flex-wrap">
+                    {/* 🔄 Reassign Button (Only for Failed Attempts) */}
+                    {score !== null && !isPass && (
+                      <form action={autoReassignQuiz}>
+                        <input type="hidden" name="attempt_id" value={row.attempt_id} />
+                        <input type="hidden" name="agent_id" value={row.agent_id} />
+                        <input type="hidden" name="qa_id" value={row.qa_id} />
+                        <input type="hidden" name="campaign" value={campaign} />
+                        <input type="hidden" name="eval_id" value={row.evaluation_id} />
+                        <button type="submit" className="text-[10px] font-bold text-purple-600 bg-purple-50 px-2.5 py-1.5 rounded hover:bg-purple-100 transition-colors uppercase border border-purple-100">
+                          🔄 Reassign
+                        </button>
+                      </form>
+                    )}
+
                     {row.status === 'ASSIGNED' && (
                       <form action={async () => { await sendIndividualReminder(row.agent_id, row.evaluations?.title) }}>
                         <button type="submit" className="text-[10px] font-bold text-orange-600 bg-orange-50 px-2.5 py-1.5 rounded hover:bg-orange-100 transition-colors uppercase">Remind</button>
