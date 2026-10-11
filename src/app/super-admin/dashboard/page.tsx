@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import ReportButtons from '@/components/ReportButtons'
 import ExportCSV from '@/components/ExportCSV'
-import TrackingTable from '@/components/TrackingTable' // 🆕 New dynamic table
+import TrackingTable from '@/components/TrackingTable'
 
 export default async function SuperAdminDashboard({
   searchParams
@@ -26,7 +26,7 @@ export default async function SuperAdminDashboard({
   
   let query = supabaseAdmin
     .from('evaluation_attempts')
-    .select(`*, evaluations!inner(title, passing_score, created_by), agent:profiles!evaluation_attempts_agent_id_fkey(full_name), qa:profiles!evaluation_attempts_qa_id_fkey(full_name)`)
+    .select(`*, evaluations!inner(title, passing_score, created_by, campaign), agent:profiles!evaluation_attempts_agent_id_fkey(full_name), qa:profiles!evaluation_attempts_qa_id_fkey(full_name)`)
     .order('created_at', { ascending: false })
 
   if (from) query = query.gte('created_at', `${from}T00:00:00Z`)
@@ -42,27 +42,50 @@ export default async function SuperAdminDashboard({
 
   const qaPerformance: Record<string, any> = {}
   const agentStats: Record<string, any> = {}
+  const campaignStats: Record<string, any> = {}
+  let totalPassed = 0
+  let totalFailed = 0
 
   const enrichedReports = reports?.map((r: any) => {
     const assignerId = r.evaluations?.created_by
     const assignerName = profileMap[assignerId] || 'Admin / Unknown'
     r.qaName = assignerName 
     
-    // 🛠️ FIX: Cap Score at 100%
+    // 🛠️ 104% Error Fix: Cap Score at 100%
     if (r.overall_score !== null && r.overall_score > 100) r.overall_score = 100 
 
+    // QA Stats
     if (!qaPerformance[assignerId]) qaPerformance[assignerId] = { name: assignerName, totalAssigned: 0, totalSubmitted: 0, totalReviewed: 0, totalRecheck: 0 }
     qaPerformance[assignerId].totalAssigned += 1
     if (r.status !== 'ASSIGNED') qaPerformance[assignerId].totalSubmitted += 1
     if (r.status === 'PUBLISHED') qaPerformance[assignerId].totalReviewed += 1
     if (r.status === 'RECHECK_REQUESTED') qaPerformance[assignerId].totalRecheck += 1
 
-    const agentName = r.agent?.full_name || 'Unknown Agent'
-    if (!agentStats[agentName]) agentStats[agentName] = { name: agentName, assigned: 0, passed: 0, failed: 0 }
-    agentStats[agentName].assigned += 1
+    // Pass/Fail Counting
     if (r.overall_score !== null && r.evaluations?.passing_score !== null) {
+      if (r.overall_score >= r.evaluations.passing_score) totalPassed++
+      else totalFailed++
+    }
+
+    // Agent Stats
+    const agentName = r.agent?.full_name || 'Unknown Agent'
+    if (!agentStats[agentName]) agentStats[agentName] = { name: agentName, assigned: 0, submitted: 0, passed: 0, failed: 0, sumScore: 0 }
+    agentStats[agentName].assigned += 1
+    if (r.status !== 'ASSIGNED') agentStats[agentName].submitted += 1
+    if (r.overall_score !== null && r.evaluations?.passing_score !== null) {
+      agentStats[agentName].sumScore += r.overall_score
       if (r.overall_score >= r.evaluations.passing_score) agentStats[agentName].passed += 1
       else agentStats[agentName].failed += 1
+    }
+
+    // Campaign Stats
+    const campaignName = r.evaluations?.campaign || 'General'
+    if (!campaignStats[campaignName]) campaignStats[campaignName] = { name: campaignName, assigned: 0, submitted: 0, passed: 0, failed: 0 }
+    campaignStats[campaignName].assigned += 1
+    if (r.status !== 'ASSIGNED') campaignStats[campaignName].submitted += 1
+    if (r.overall_score !== null && r.evaluations?.passing_score !== null) {
+      if (r.overall_score >= r.evaluations.passing_score) campaignStats[campaignName].passed += 1
+      else campaignStats[campaignName].failed += 1
     }
 
     return r
@@ -70,6 +93,8 @@ export default async function SuperAdminDashboard({
   
   const qaReportArray = Object.values(qaPerformance)
   const agentReportArray = Object.values(agentStats)
+  const campaignReportArray = Object.values(campaignStats)
+  const passRate = (totalPassed + totalFailed) > 0 ? Math.round((totalPassed / (totalPassed + totalFailed)) * 100) : 0
 
   return (
     <div className="min-h-screen bg-shikho-canvas p-8">
@@ -96,13 +121,33 @@ export default async function SuperAdminDashboard({
           <Link href="/super-admin/impact-report" className="flex items-center gap-2 bg-gradient-to-r from-shikho-indigo-600 to-shikho-magenta-500 text-white px-5 py-3 rounded-xl font-bold hover:shadow-lg shadow-sm text-sm font-poppins">📸 View Visual Impact Report</Link>
         </div>
 
-        {/* Original 3 Cards Layout */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* 4 Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100"><p className="text-sm text-gray-500 font-bold">Total Assigned</p><p className="text-3xl font-black text-gray-900">{total}</p></div>
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100"><p className="text-sm text-gray-500 font-bold">Agent Submitted</p><p className="text-3xl font-black text-blue-600">{agentCompleted}</p></div>
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100"><p className="text-sm text-gray-500 font-bold">QA Reviewed</p><p className="text-3xl font-black text-emerald-600">{qaReviewed}</p></div>
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-orange-100 bg-orange-50/30"><p className="text-sm text-orange-600 font-bold">Pass Rate</p><p className="text-3xl font-black text-orange-600">{passRate}%</p></div>
         </div>
 
+        {/* 🎯 Performance Overview (Pass/Fail) */}
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-emerald-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900 font-poppins">Performance Overview</h2>
+            <p className="text-sm text-gray-500">Global pass/fail count based on target passing score</p>
+          </div>
+          <div className="flex gap-8">
+            <div className="text-center">
+              <p className="text-sm font-bold text-gray-500 uppercase">Total Passed</p>
+              <p className="text-3xl font-black text-emerald-600">{totalPassed}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-sm font-bold text-gray-500 uppercase">Total Failed</p>
+              <p className="text-3xl font-black text-red-500">{totalFailed}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* QA & Campaign Reports */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {qaReportArray.length > 0 && (
             <div className="bg-white rounded-2xl shadow-sm border border-shikho-magenta-100 overflow-hidden">
@@ -129,23 +174,24 @@ export default async function SuperAdminDashboard({
             </div>
           )}
 
-          {agentReportArray.length > 0 && (
+          {campaignReportArray.length > 0 && (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="p-5 border-b border-gray-100 bg-blue-50/50">
-                <h2 className="text-md font-semibold text-blue-900 font-poppins">Agent Pass/Fail Report</h2>
+              <div className="p-5 border-b border-gray-100 bg-purple-50/50">
+                <h2 className="text-md font-semibold text-purple-900 font-poppins">Campaign-wise Report</h2>
               </div>
               <div className="overflow-x-auto max-h-[300px]">
                 <table className="w-full text-left">
                   <thead className="bg-white text-gray-500 text-[10px] uppercase font-bold sticky top-0 shadow-sm">
-                    <tr><th className="px-4 py-3">Agent Name</th><th className="px-4 py-3 text-center">Assigned</th><th className="px-4 py-3 text-center text-emerald-600">Passed</th><th className="px-4 py-3 text-center text-red-500">Failed</th></tr>
+                    <tr><th className="px-4 py-3">Campaign</th><th className="px-4 py-3 text-center">Assigned</th><th className="px-4 py-3 text-center">Submitted</th><th className="px-4 py-3 text-center text-emerald-600">Passed</th><th className="px-4 py-3 text-center text-red-500">Failed</th></tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {agentReportArray.map((ag: any, idx: number) => (
+                    {campaignReportArray.map((camp: any, idx: number) => (
                       <tr key={idx} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 text-xs font-bold">{ag.name}</td>
-                        <td className="px-4 py-3 text-xs font-bold text-center text-gray-600">{ag.assigned}</td>
-                        <td className="px-4 py-3 text-xs font-bold text-center text-emerald-600 bg-emerald-50/30">{ag.passed}</td>
-                        <td className="px-4 py-3 text-xs font-bold text-center text-red-500 bg-red-50/30">{ag.failed}</td>
+                        <td className="px-4 py-3 text-xs font-bold text-purple-600">{camp.name}</td>
+                        <td className="px-4 py-3 text-xs font-bold text-center text-gray-600">{camp.assigned}</td>
+                        <td className="px-4 py-3 text-xs font-bold text-center text-blue-600">{camp.submitted}</td>
+                        <td className="px-4 py-3 text-xs font-bold text-center text-emerald-600 bg-emerald-50/30">{camp.passed}</td>
+                        <td className="px-4 py-3 text-xs font-bold text-center text-red-500 bg-red-50/30">{camp.failed}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -154,6 +200,33 @@ export default async function SuperAdminDashboard({
             </div>
           )}
         </div>
+
+        {/* Agent-wise Report */}
+        {agentReportArray.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="p-5 border-b border-gray-100 bg-blue-50/50">
+              <h2 className="text-md font-semibold text-blue-900 font-poppins">Agent Pass/Fail Report</h2>
+            </div>
+            <div className="overflow-x-auto max-h-[300px]">
+              <table className="w-full text-left">
+                <thead className="bg-white text-gray-500 text-[10px] uppercase font-bold sticky top-0 shadow-sm">
+                  <tr><th className="px-4 py-3">Agent Name</th><th className="px-4 py-3 text-center">Assigned</th><th className="px-4 py-3 text-center text-blue-600">Submitted</th><th className="px-4 py-3 text-center text-emerald-600">Passed</th><th className="px-4 py-3 text-center text-red-500">Failed</th></tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {agentReportArray.map((ag: any, idx: number) => (
+                    <tr key={idx} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-xs font-bold">{ag.name}</td>
+                      <td className="px-4 py-3 text-xs font-bold text-center text-gray-600">{ag.assigned}</td>
+                      <td className="px-4 py-3 text-xs font-bold text-center text-blue-600">{ag.submitted}</td>
+                      <td className="px-4 py-3 text-xs font-bold text-center text-emerald-600 bg-emerald-50/30">{ag.passed}</td>
+                      <td className="px-4 py-3 text-xs font-bold text-center text-red-500 bg-red-50/30">{ag.failed}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* Dynamic Client Table */}
         <TrackingTable reports={enrichedReports} profileMap={profileMap} userRole={profile?.role} userId={user.id} />
