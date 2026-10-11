@@ -24,7 +24,6 @@ export default async function SuperAdminDashboard({
   
   const supabaseAdmin = createAdminClient()
   
-  // 🛠️ Fetching attempt_type and agent site
   let query = supabaseAdmin
     .from('evaluation_attempts')
     .select(`*, evaluations!inner(title, passing_score, created_by, campaign), agent:profiles!evaluation_attempts_agent_id_fkey(full_name, site, qa_name), qa:profiles!evaluation_attempts_qa_id_fkey(full_name)`)
@@ -37,6 +36,9 @@ export default async function SuperAdminDashboard({
   const { data: profiles } = await supabaseAdmin.from('profiles').select('id, full_name')
   const profileMap = profiles?.reduce((acc: any, p: any) => ({ ...acc, [p.id]: p.full_name || 'Admin' }), {}) || {}
 
+  // 🆕 NEW: Dropdown er jonno shob quiz tule ana holo
+  const { data: allQuizzes } = await supabaseAdmin.from('evaluations').select('id, title, campaign').order('created_at', { ascending: false })
+
   const total = reports?.length || 0
   const agentCompleted = reports?.filter(r => r.status !== 'ASSIGNED').length || 0
   const qaReviewed = reports?.filter(r => r.status === 'PUBLISHED').length || 0
@@ -44,7 +46,6 @@ export default async function SuperAdminDashboard({
   let totalPassed = 0
   let totalFailed = 0
 
-  // 🎯 Boss's Master Summary Logic
   const masterStats: Record<string, any> = {}
 
   const enrichedReports = reports?.map((r: any) => {
@@ -52,7 +53,6 @@ export default async function SuperAdminDashboard({
     const site = r.agent?.site || 'N/A'
     r.qaName = qaName 
     
-    // Cap Score at 100%
     if (r.overall_score !== null && r.overall_score > 100) r.overall_score = 100 
     const isPass = r.overall_score !== null && r.overall_score >= r.evaluations?.passing_score
 
@@ -61,7 +61,6 @@ export default async function SuperAdminDashboard({
       else totalFailed++
     }
 
-    // 📊 Master Data Aggregation
     const key = `${qaName}-${site}`
     if (!masterStats[key]) {
       masterStats[key] = { qaName, site, initialAssigned: 0, initialPass: 0, initialFail: 0, reassignTotal: 0, reassignPass: 0, reassignFail: 0 }
@@ -113,7 +112,6 @@ export default async function SuperAdminDashboard({
           <Link href="/super-admin/impact-report" className="flex items-center gap-2 bg-gradient-to-r from-shikho-indigo-600 to-shikho-magenta-500 text-white px-5 py-3 rounded-xl font-bold hover:shadow-lg shadow-sm text-sm font-poppins">📸 View Visual Impact Report</Link>
         </div>
 
-        {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100"><p className="text-sm text-gray-500 font-bold">Total Assigned</p><p className="text-3xl font-black text-gray-900">{total}</p></div>
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100"><p className="text-sm text-gray-500 font-bold">Agent Submitted</p><p className="text-3xl font-black text-blue-600">{agentCompleted}</p></div>
@@ -122,7 +120,6 @@ export default async function SuperAdminDashboard({
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-red-200 bg-red-50/50"><p className="text-sm text-red-700 font-bold">Total Failed</p><p className="text-3xl font-black text-red-600">{totalFailed}</p></div>
         </div>
 
-        {/* 👑 Boss's Master Report (QA & Site Wise with Reassign Stats) */}
         {masterReportArray.length > 0 && (
           <div className="bg-white rounded-2xl shadow-sm border border-indigo-200 overflow-hidden">
             <div className="p-5 border-b border-indigo-100 bg-indigo-50 flex justify-between items-center">
@@ -155,12 +152,10 @@ export default async function SuperAdminDashboard({
                       <td className="px-4 py-3 text-xs font-bold text-gray-900">{data.qaName}</td>
                       <td className="px-4 py-3 text-xs font-bold text-blue-600">{data.site}</td>
                       
-                      {/* Initial Stats */}
                       <td className="px-3 py-3 text-xs font-bold text-center border-l bg-gray-50/30">{data.initialAssigned}</td>
                       <td className="px-3 py-3 text-xs font-bold text-center text-emerald-600 bg-gray-50/30">{data.initialPass}</td>
                       <td className="px-3 py-3 text-xs font-bold text-center text-red-500 bg-gray-50/30">{data.initialFail}</td>
                       
-                      {/* Reassign Stats */}
                       <td className="px-3 py-3 text-xs font-bold text-center border-l text-purple-700 bg-purple-50/30">{data.reassignTotal}</td>
                       <td className="px-3 py-3 text-xs font-bold text-center text-emerald-600 bg-purple-50/30">{data.reassignPass}</td>
                       <td className="px-3 py-3 text-xs font-bold text-center text-red-500 bg-purple-50/30">{data.reassignFail}</td>
@@ -172,8 +167,8 @@ export default async function SuperAdminDashboard({
           </div>
         )}
 
-        {/* Dynamic Client Table */}
-        <TrackingTable reports={enrichedReports} profileMap={profileMap} userRole={profile?.role} userId={user.id} />
+        {/* 🆕 UPDATED: Sending allQuizzes to TrackingTable */}
+        <TrackingTable reports={enrichedReports} profileMap={profileMap} userRole={profile?.role} userId={user.id} allQuizzes={allQuizzes || []} />
 
       </div>
     </div>
