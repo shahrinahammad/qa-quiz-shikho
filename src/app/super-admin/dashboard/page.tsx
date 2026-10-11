@@ -18,9 +18,23 @@ export default async function SuperAdminDashboard({
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'super_admin') redirect('/login')
 
-  const todayDate = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Dhaka' }) 
-  const from = searchParams.from !== undefined ? searchParams.from : todayDate
-  const to = searchParams.to !== undefined ? searchParams.to : todayDate
+  // 🛠️ NEW: Saturday to Friday Default Date Logic
+  const today = new Date()
+  // Adjust to Bangladesh Timezone conceptually
+  const dayOfWeek = today.getDay() // 0 = Sun, 1 = Mon, ..., 6 = Sat
+  const daysSinceSaturday = dayOfWeek === 6 ? 0 : dayOfWeek + 1
+  
+  const lastSaturday = new Date(today)
+  lastSaturday.setDate(today.getDate() - daysSinceSaturday)
+  
+  const nextFriday = new Date(lastSaturday)
+  nextFriday.setDate(lastSaturday.getDate() + 6)
+
+  const defaultFrom = lastSaturday.toLocaleDateString('en-CA', { timeZone: 'Asia/Dhaka' })
+  const defaultTo = nextFriday.toLocaleDateString('en-CA', { timeZone: 'Asia/Dhaka' })
+
+  const from = searchParams.from !== undefined ? searchParams.from : defaultFrom
+  const to = searchParams.to !== undefined ? searchParams.to : defaultTo
   
   const supabaseAdmin = createAdminClient()
   
@@ -36,7 +50,6 @@ export default async function SuperAdminDashboard({
   const { data: profiles } = await supabaseAdmin.from('profiles').select('id, full_name')
   const profileMap = profiles?.reduce((acc: any, p: any) => ({ ...acc, [p.id]: p.full_name || 'Admin' }), {}) || {}
 
-  // 🆕 NEW: Dropdown er jonno shob quiz tule ana holo
   const { data: allQuizzes } = await supabaseAdmin.from('evaluations').select('id, title, campaign').order('created_at', { ascending: false })
 
   const total = reports?.length || 0
@@ -46,11 +59,15 @@ export default async function SuperAdminDashboard({
   let totalPassed = 0
   let totalFailed = 0
 
-  const masterStats: Record<string, any> = {}
+  // 🎯 Separate Stats Objects
+  const qaStats: Record<string, any> = {}
+  const siteStats: Record<string, any> = {}
+  const campaignStats: Record<string, any> = {}
 
   const enrichedReports = reports?.map((r: any) => {
     const qaName = profileMap[r.evaluations?.created_by] || 'Admin'
     const site = r.agent?.site || 'N/A'
+    const campaign = r.evaluations?.campaign || 'General'
     r.qaName = qaName 
     
     if (r.overall_score !== null && r.overall_score > 100) r.overall_score = 100 
@@ -61,31 +78,88 @@ export default async function SuperAdminDashboard({
       else totalFailed++
     }
 
-    const key = `${qaName}-${site}`
-    if (!masterStats[key]) {
-      masterStats[key] = { qaName, site, initialAssigned: 0, initialPass: 0, initialFail: 0, reassignTotal: 0, reassignPass: 0, reassignFail: 0 }
-    }
-
     const isReassigned = r.attempt_type === 'Reassigned'
 
-    if (!isReassigned) {
-      masterStats[key].initialAssigned += 1
-      if (r.overall_score !== null) {
-        if (isPass) masterStats[key].initialPass += 1
-        else masterStats[key].initialFail += 1
-      }
-    } else {
-      masterStats[key].reassignTotal += 1
-      if (r.overall_score !== null) {
-        if (isPass) masterStats[key].reassignPass += 1
-        else masterStats[key].reassignFail += 1
+    // Helper to initialize stats
+    const initStats = (name: string) => ({ name, initialAssigned: 0, initialPass: 0, initialFail: 0, reassignTotal: 0, reassignPass: 0, reassignFail: 0 })
+
+    if (!qaStats[qaName]) qaStats[qaName] = initStats(qaName)
+    if (!siteStats[site]) siteStats[site] = initStats(site)
+    if (!campaignStats[campaign]) campaignStats[campaign] = initStats(campaign)
+
+    // Update Stats
+    const updateStats = (obj: any) => {
+      if (!isReassigned) {
+        obj.initialAssigned += 1
+        if (r.overall_score !== null) {
+          if (isPass) obj.initialPass += 1
+          else obj.initialFail += 1
+        }
+      } else {
+        obj.reassignTotal += 1
+        if (r.overall_score !== null) {
+          if (isPass) obj.reassignPass += 1
+          else obj.reassignFail += 1
+        }
       }
     }
+
+    updateStats(qaStats[qaName])
+    updateStats(siteStats[site])
+    updateStats(campaignStats[campaign])
 
     return r
   }) || []
   
-  const masterReportArray = Object.values(masterStats)
+  const qaReportArray = Object.values(qaStats)
+  const siteReportArray = Object.values(siteStats)
+  const campaignReportArray = Object.values(campaignStats)
+
+  // Reusable Table Component for the 3 categories
+  const PerformanceTable = ({ title, data, colorClass, bgClass }: { title: string, data: any[], colorClass: string, bgClass: string }) => (
+    <div className={`bg-white rounded-2xl shadow-sm border border-${colorClass}-200 overflow-hidden`}>
+      <div className={`p-5 border-b border-${colorClass}-100 ${bgClass} flex justify-between items-center`}>
+        <div>
+          <h2 className={`text-lg font-bold text-${colorClass}-900 font-poppins`}>{title}</h2>
+          <p className={`text-xs text-${colorClass}-700 mt-1`}>Initial attempts vs Reassigned attempts</p>
+        </div>
+      </div>
+      <div className="overflow-x-auto max-h-[400px]">
+        <table className="w-full text-left border-collapse">
+          <thead className="bg-white text-gray-500 text-[10px] uppercase font-bold sticky top-0 shadow-sm z-10">
+            <tr>
+              <th className="px-4 py-3 border-b" rowSpan={2}>Name</th>
+              <th className="px-4 py-2 text-center border-b border-l bg-gray-50" colSpan={3}>Initial Assessment</th>
+              <th className="px-4 py-2 text-center border-b border-l bg-purple-50" colSpan={3}>Re-Assessment</th>
+            </tr>
+            <tr>
+              <th className="px-3 py-2 text-center border-b border-l text-gray-600 bg-gray-50">Assigned</th>
+              <th className="px-3 py-2 text-center border-b text-emerald-600 bg-gray-50">Passed</th>
+              <th className="px-3 py-2 text-center border-b text-red-500 bg-gray-50">Failed</th>
+              <th className="px-3 py-2 text-center border-b border-l text-purple-600 bg-purple-50">Assigned</th>
+              <th className="px-3 py-2 text-center border-b text-emerald-600 bg-purple-50">Passed</th>
+              <th className="px-3 py-2 text-center border-b text-red-500 bg-purple-50">Failed</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {data.map((row: any, idx: number) => (
+              <tr key={idx} className="hover:bg-gray-50">
+                <td className="px-4 py-3 text-xs font-bold text-gray-900">{row.name}</td>
+                
+                <td className="px-3 py-3 text-xs font-bold text-center border-l bg-gray-50/30">{row.initialAssigned}</td>
+                <td className="px-3 py-3 text-xs font-bold text-center text-emerald-600 bg-gray-50/30">{row.initialPass}</td>
+                <td className="px-3 py-3 text-xs font-bold text-center text-red-500 bg-gray-50/30">{row.initialFail}</td>
+                
+                <td className="px-3 py-3 text-xs font-bold text-center border-l text-purple-700 bg-purple-50/30">{row.reassignTotal}</td>
+                <td className="px-3 py-3 text-xs font-bold text-center text-emerald-600 bg-purple-50/30">{row.reassignPass}</td>
+                <td className="px-3 py-3 text-xs font-bold text-center text-red-500 bg-purple-50/30">{row.reassignFail}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
 
   return (
     <div className="min-h-screen bg-shikho-canvas p-8">
@@ -112,6 +186,7 @@ export default async function SuperAdminDashboard({
           <Link href="/super-admin/impact-report" className="flex items-center gap-2 bg-gradient-to-r from-shikho-indigo-600 to-shikho-magenta-500 text-white px-5 py-3 rounded-xl font-bold hover:shadow-lg shadow-sm text-sm font-poppins">📸 View Visual Impact Report</Link>
         </div>
 
+        {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100"><p className="text-sm text-gray-500 font-bold">Total Assigned</p><p className="text-3xl font-black text-gray-900">{total}</p></div>
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100"><p className="text-sm text-gray-500 font-bold">Agent Submitted</p><p className="text-3xl font-black text-blue-600">{agentCompleted}</p></div>
@@ -120,54 +195,14 @@ export default async function SuperAdminDashboard({
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-red-200 bg-red-50/50"><p className="text-sm text-red-700 font-bold">Total Failed</p><p className="text-3xl font-black text-red-600">{totalFailed}</p></div>
         </div>
 
-        {masterReportArray.length > 0 && (
-          <div className="bg-white rounded-2xl shadow-sm border border-indigo-200 overflow-hidden">
-            <div className="p-5 border-b border-indigo-100 bg-indigo-50 flex justify-between items-center">
-              <div>
-                <h2 className="text-lg font-bold text-indigo-900 font-poppins">Master Performance Summary (QA & Site Wise)</h2>
-                <p className="text-xs text-indigo-700 mt-1">Initial attempts vs Reassigned attempts breakdown</p>
-              </div>
-            </div>
-            <div className="overflow-x-auto max-h-[400px]">
-              <table className="w-full text-left border-collapse">
-                <thead className="bg-white text-gray-500 text-[10px] uppercase font-bold sticky top-0 shadow-sm z-10">
-                  <tr>
-                    <th className="px-4 py-3 border-b" rowSpan={2}>QA Name</th>
-                    <th className="px-4 py-3 border-b" rowSpan={2}>Site</th>
-                    <th className="px-4 py-2 text-center border-b border-l bg-gray-50" colSpan={3}>Initial Assessment</th>
-                    <th className="px-4 py-2 text-center border-b border-l bg-purple-50" colSpan={3}>Re-Assessment</th>
-                  </tr>
-                  <tr>
-                    <th className="px-3 py-2 text-center border-b border-l text-gray-600 bg-gray-50">Assigned</th>
-                    <th className="px-3 py-2 text-center border-b text-emerald-600 bg-gray-50">Passed</th>
-                    <th className="px-3 py-2 text-center border-b text-red-500 bg-gray-50">Failed</th>
-                    <th className="px-3 py-2 text-center border-b border-l text-purple-600 bg-purple-50">Assigned</th>
-                    <th className="px-3 py-2 text-center border-b text-emerald-600 bg-purple-50">Passed</th>
-                    <th className="px-3 py-2 text-center border-b text-red-500 bg-purple-50">Failed</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {masterReportArray.map((data: any, idx: number) => (
-                    <tr key={idx} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-xs font-bold text-gray-900">{data.qaName}</td>
-                      <td className="px-4 py-3 text-xs font-bold text-blue-600">{data.site}</td>
-                      
-                      <td className="px-3 py-3 text-xs font-bold text-center border-l bg-gray-50/30">{data.initialAssigned}</td>
-                      <td className="px-3 py-3 text-xs font-bold text-center text-emerald-600 bg-gray-50/30">{data.initialPass}</td>
-                      <td className="px-3 py-3 text-xs font-bold text-center text-red-500 bg-gray-50/30">{data.initialFail}</td>
-                      
-                      <td className="px-3 py-3 text-xs font-bold text-center border-l text-purple-700 bg-purple-50/30">{data.reassignTotal}</td>
-                      <td className="px-3 py-3 text-xs font-bold text-center text-emerald-600 bg-purple-50/30">{data.reassignPass}</td>
-                      <td className="px-3 py-3 text-xs font-bold text-center text-red-500 bg-purple-50/30">{data.reassignFail}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+        {/* 👑 Separate Performance Tables */}
+        <div className="grid grid-cols-1 gap-8">
+          {qaReportArray.length > 0 && <PerformanceTable title="QA Performance Summary" data={qaReportArray} colorClass="indigo" bgClass="bg-indigo-50" />}
+          {siteReportArray.length > 0 && <PerformanceTable title="Site Performance Summary" data={siteReportArray} colorClass="blue" bgClass="bg-blue-50" />}
+          {campaignReportArray.length > 0 && <PerformanceTable title="Campaign Performance Summary" data={campaignReportArray} colorClass="purple" bgClass="bg-purple-50" />}
+        </div>
 
-        {/* 🆕 UPDATED: Sending allQuizzes to TrackingTable */}
+        {/* Tracking Table */}
         <TrackingTable reports={enrichedReports} profileMap={profileMap} userRole={profile?.role} userId={user.id} allQuizzes={allQuizzes || []} />
 
       </div>
