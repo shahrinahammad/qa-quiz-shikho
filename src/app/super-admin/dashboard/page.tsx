@@ -24,9 +24,10 @@ export default async function SuperAdminDashboard({
   
   const supabaseAdmin = createAdminClient()
   
+  // 🛠️ FIXED: Removed 'campaign' from this query to prevent Database Error
   let query = supabaseAdmin
     .from('evaluation_attempts')
-    .select(`*, evaluations!inner(title, passing_score, created_by, campaign), agent:profiles!evaluation_attempts_agent_id_fkey(full_name), qa:profiles!evaluation_attempts_qa_id_fkey(full_name)`)
+    .select(`*, evaluations!inner(title, passing_score, created_by), agent:profiles!evaluation_attempts_agent_id_fkey(full_name), qa:profiles!evaluation_attempts_qa_id_fkey(full_name)`)
     .order('created_at', { ascending: false })
 
   if (from) query = query.gte('created_at', `${from}T00:00:00Z`)
@@ -51,7 +52,7 @@ export default async function SuperAdminDashboard({
     const assignerName = profileMap[assignerId] || 'Admin / Unknown'
     r.qaName = assignerName 
     
-    // 🛠️ Cap Score at 100%
+    // Cap Score at 100%
     if (r.overall_score !== null && r.overall_score > 100) r.overall_score = 100 
 
     // QA Stats
@@ -78,8 +79,8 @@ export default async function SuperAdminDashboard({
       else agentStats[agentName].failed += 1
     }
 
-    // Campaign Stats
-    const campaignName = r.evaluations?.campaign || 'General'
+    // Campaign Stats (Mocked for now)
+    const campaignName = 'General' 
     if (!campaignStats[campaignName]) campaignStats[campaignName] = { name: campaignName, assigned: 0, submitted: 0, passed: 0, failed: 0 }
     campaignStats[campaignName].assigned += 1
     if (r.status !== 'ASSIGNED') campaignStats[campaignName].submitted += 1
@@ -120,7 +121,7 @@ export default async function SuperAdminDashboard({
           <Link href="/super-admin/impact-report" className="flex items-center gap-2 bg-gradient-to-r from-shikho-indigo-600 to-shikho-magenta-500 text-white px-5 py-3 rounded-xl font-bold hover:shadow-lg shadow-sm text-sm font-poppins">📸 View Visual Impact Report</Link>
         </div>
 
-        {/* 🎯 5 Summary Cards with Pass & Fail */}
+        {/* 5 Summary Cards with Pass & Fail */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
             <p className="text-sm text-gray-500 font-bold">Total Assigned</p>
