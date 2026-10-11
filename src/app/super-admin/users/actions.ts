@@ -14,6 +14,9 @@ export async function createUser(formData: FormData) {
   const email = formData.get('email') as string
   const fullName = formData.get('fullName') as string
   const role = formData.get('role') as string
+  const site = formData.get('site') as string
+  const tl_name = formData.get('tlName') as string
+  const qa_name = formData.get('qaName') as string
   const password = generateDynamicPassword() 
 
   const supabaseAdmin = createAdminClient()
@@ -25,10 +28,9 @@ export async function createUser(formData: FormData) {
 
   if (data.user) {
     await supabaseAdmin.from('profiles').upsert({
-      id: data.user.id, email: email, full_name: fullName, role: role, temp_password: password, force_password_change: true 
+      id: data.user.id, email: email, full_name: fullName, role: role, temp_password: password, force_password_change: true, site: site, tl_name: tl_name, qa_name: qa_name
     })
     
-    // 🆕 CC baad deya hoyeche
     try { await sendAgentCredentialEmail(email, fullName, password, false) } catch (e) {}
   }
 
@@ -48,7 +50,6 @@ export async function resetUserPassword(formData: FormData) {
     temp_password: newPassword, force_password_change: true 
   }).eq('id', userId).select().single()
 
-  // 🆕 CC baad deya hoyeche
   if (profile) {
     try { await sendAgentCredentialEmail(profile.email, profile.full_name, newPassword, true) } catch (e) {}
   }
@@ -94,16 +95,25 @@ export async function createBulkUsers(formData: FormData) {
       const email = columns[0]
       const fullName = columns[1]
       const role = columns[2] ? columns[2].toLowerCase() : 'agent' 
+      const site = columns[3] || null
+      const tl_name = columns[4] || null
+      const qa_name = columns[5] || null
       const password = generateDynamicPassword() 
 
       if (email) {
         const { data: existingUser } = await supabaseAdmin.from('profiles').select('id').eq('email', email).single()
-        if (existingUser) { existCount++; continue; }
+        
+        if (existingUser) { 
+          // Update existing user with new Site, TL, QA
+          await supabaseAdmin.from('profiles').update({ full_name: fullName, role: role, site: site, tl_name: tl_name, qa_name: qa_name }).eq('id', existingUser.id)
+          existCount++; 
+          continue; 
+        }
 
         const { data, error } = await supabaseAdmin.auth.admin.createUser({ email, password, email_confirm: true })
         if (!error && data?.user) {
           await supabaseAdmin.from('profiles').upsert({
-            id: data.user.id, email: email, full_name: fullName, role: role, temp_password: password, force_password_change: true
+            id: data.user.id, email: email, full_name: fullName, role: role, temp_password: password, force_password_change: true, site: site, tl_name: tl_name, qa_name: qa_name
           })
           try { await sendAgentCredentialEmail(email, fullName, password, false) } catch (e) {}
           successCount++
@@ -114,7 +124,7 @@ export async function createBulkUsers(formData: FormData) {
     }
   }
   revalidatePath('/super-admin/users')
-  redirect(`/super-admin/users?success=Created: ${successCount} | Exists: ${existCount} | Failed: ${errorCount}`)
+  redirect(`/super-admin/users?success=Created: ${successCount} | Updated Exists: ${existCount} | Failed: ${errorCount}`)
 }
 
 export async function sendIndividualEmailAction(formData: FormData) {
