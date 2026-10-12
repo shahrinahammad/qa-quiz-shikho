@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createEvaluation } from './actions'
 import { redirect } from 'next/navigation'
-import AgentSelector from './AgentSelector' // 🆕 নতুন কম্পোনেন্ট ইম্পোর্ট
+import AgentSelector from './AgentSelector' 
 
 export default async function EvaluationsPage({
   searchParams
@@ -16,19 +16,16 @@ export default async function EvaluationsPage({
 
   const supabaseAdmin = createAdminClient()
   
-  // অ্যাডমিন চাবি দিয়ে এজেন্টদের লিস্ট আনা
   const { data: agents } = await supabaseAdmin
     .from('profiles')
     .select('id, email, full_name')
     .eq('role', 'agent')
 
-  // অ্যাডমিন চাবি দিয়ে কোয়েশ্চেন ব্যাংক থেকে সব প্রশ্ন আনা
   const { data: questions } = await supabaseAdmin
     .from('questions')
     .select('*')
     .order('created_at', { ascending: false })
 
-  // তৈরি করা ইভালুয়েশনগুলো আনা
   const { data: evaluations } = await supabaseAdmin
     .from('evaluations')
     .select('*')
@@ -47,7 +44,6 @@ export default async function EvaluationsPage({
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
-          {/* Create Evaluation Form */}
           <div className="lg:col-span-1 bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-fit">
             <h2 className="text-lg font-semibold text-gray-900 mb-6 font-poppins">Assign New Evaluation</h2>
             
@@ -77,15 +73,16 @@ export default async function EvaluationsPage({
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1 font-poppins">Duration (Mins)</label>
-                  <input type="number" name="duration_minutes" required defaultValue="30" min="1" className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-shikho-indigo-500 text-sm" />
+                  {/* 🛠️ UPDATED: Default 10 */}
+                  <input type="number" name="duration_minutes" required defaultValue="10" min="1" className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-shikho-indigo-500 text-sm" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1 font-poppins">Pass Score (%)</label>
-                  <input type="number" name="passing_score" required defaultValue="80" min="1" max="100" className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-shikho-indigo-500 text-sm" />
+                  {/* 🛠️ UPDATED: Default 70 */}
+                  <input type="number" name="passing_score" required defaultValue="70" min="1" max="100" className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-shikho-indigo-500 text-sm" />
                 </div>
               </div>
 
-              {/* 🆕 Agent Multi-Select Component */}
               <div className="mt-4">
                 <AgentSelector agents={agents || []} />
               </div>
@@ -117,7 +114,6 @@ export default async function EvaluationsPage({
             </form>
           </div>
 
-          {/* Evaluations List Table */}
           <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="p-6 border-b border-gray-100">
               <h2 className="text-lg font-semibold text-gray-900 font-poppins">Active Evaluations</h2>
@@ -127,7 +123,7 @@ export default async function EvaluationsPage({
                 <thead>
                   <tr className="bg-shikho-indigo-50 text-gray-600 text-xs uppercase tracking-wider font-poppins">
                     <th className="px-6 py-4 font-medium">Evaluation ID</th>
-                    <th className="px-6 py-4 font-medium">Title</th>
+                    <th className="px-6 py-4 font-medium">Title & Campaign</th>
                     <th className="px-6 py-4 font-medium">Questions</th>
                     <th className="px-6 py-4 font-medium">Duration</th>
                     <th className="px-6 py-4 font-medium">Status</th>
@@ -144,7 +140,10 @@ export default async function EvaluationsPage({
                     evaluations?.map((ev) => (
                       <tr key={ev.id} className="hover:bg-gray-50 transition-colors">
                         <td className="px-6 py-4 text-sm font-medium text-gray-900 font-poppins">{ev.evaluation_id}</td>
-                        <td className="px-6 py-4 text-sm text-gray-700 font-poppins font-medium">{ev.title}</td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-gray-900 font-poppins font-bold">{ev.title}</div>
+                          <div className="text-xs text-purple-600 font-bold mt-0.5">{ev.campaign || 'General'}</div>
+                        </td>
                         <td className="px-6 py-4 text-sm text-gray-500 font-poppins">
                           {ev.question_ids?.length || 0} Qs
                         </td>
