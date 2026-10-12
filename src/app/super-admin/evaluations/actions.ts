@@ -30,15 +30,35 @@ export async function createEvaluation(formData: FormData) {
 
   const supabaseAdmin = createAdminClient()
 
+  // 🎯 NEW LOGIC: সিলেক্ট করা প্রশ্ন থেকে Campaign এর নাম অটোমেটিক তুলে আনা
+  const { data: firstQuestion } = await supabaseAdmin
+    .from('questions')
+    .select('campaign')
+    .eq('id', question_ids[0])
+    .single()
+  
+  const campaign = firstQuestion?.campaign || 'General'
+
   const { data: assignerProfile } = await supabaseAdmin.from('profiles').select('full_name').eq('id', user.id).single()
   const assignerName = assignerProfile?.full_name || 'QA Admin'
-  const assignerEmail = user.email || '' // 🆕 CC er jonno Assigner Email
+  const assignerEmail = user.email || '' 
 
   const evaluation_id = `EVL-${Date.now().toString().slice(-6)}`
 
+  // 🎯 NEW LOGIC: কুইজ সেভ করার সময় 'campaign' কলামেও ডেটা সেভ করা হচ্ছে
   const { data: evalData, error: evalError } = await supabase
     .from('evaluations')
-    .insert({ evaluation_id, title, description, duration_minutes, passing_score, created_by: user.id, status: 'ASSIGNED', question_ids })
+    .insert({ 
+      evaluation_id, 
+      title, 
+      description, 
+      duration_minutes, 
+      passing_score, 
+      created_by: user.id, 
+      status: 'ASSIGNED', 
+      question_ids,
+      campaign // 👈 Auto-inherited Campaign
+    })
     .select().single()
 
   if (evalError) return redirect(`/super-admin/evaluations?error=${evalError.message}`)
@@ -63,10 +83,9 @@ export async function createEvaluation(formData: FormData) {
 
       if (agentProfile?.email) {
         try {
-          // 🆕 Update kora function
           await sendQuizAssignedEmail(
             agentProfile.email,
-            assignerEmail, // CC
+            assignerEmail, 
             agentProfile.full_name || 'Agent',
             title,
             duration_minutes,
