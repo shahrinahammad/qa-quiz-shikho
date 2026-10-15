@@ -18,10 +18,8 @@ export default async function SuperAdminDashboard({
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'super_admin') redirect('/login')
 
-  // 🛠️ NEW: Saturday to Friday Default Date Logic
   const today = new Date()
-  // Adjust to Bangladesh Timezone conceptually
-  const dayOfWeek = today.getDay() // 0 = Sun, 1 = Mon, ..., 6 = Sat
+  const dayOfWeek = today.getDay() 
   const daysSinceSaturday = dayOfWeek === 6 ? 0 : dayOfWeek + 1
   
   const lastSaturday = new Date(today)
@@ -59,10 +57,12 @@ export default async function SuperAdminDashboard({
   let totalPassed = 0
   let totalFailed = 0
 
-  // 🎯 Separate Stats Objects
   const qaStats: Record<string, any> = {}
   const siteStats: Record<string, any> = {}
   const campaignStats: Record<string, any> = {}
+  
+  // 🎯 NEW: Transparency Task Report
+  const qaTaskStats: Record<string, any> = {}
 
   const enrichedReports = reports?.map((r: any) => {
     const qaName = profileMap[r.evaluations?.created_by] || 'Admin'
@@ -70,8 +70,9 @@ export default async function SuperAdminDashboard({
     const campaign = r.evaluations?.campaign || 'General'
     r.qaName = qaName 
     
+    // 🛠️ FIXED 70% Logic using Math.round
     if (r.overall_score !== null && r.overall_score > 100) r.overall_score = 100 
-    const isPass = r.overall_score !== null && r.overall_score >= r.evaluations?.passing_score
+    const isPass = r.overall_score !== null && Math.round(r.overall_score) >= (r.evaluations?.passing_score || 70)
 
     if (r.overall_score !== null) {
       if (isPass) totalPassed++
@@ -80,14 +81,12 @@ export default async function SuperAdminDashboard({
 
     const isReassigned = r.attempt_type === 'Reassigned'
 
-    // Helper to initialize stats
     const initStats = (name: string) => ({ name, initialAssigned: 0, initialPass: 0, initialFail: 0, reassignTotal: 0, reassignPass: 0, reassignFail: 0 })
 
     if (!qaStats[qaName]) qaStats[qaName] = initStats(qaName)
     if (!siteStats[site]) siteStats[site] = initStats(site)
     if (!campaignStats[campaign]) campaignStats[campaign] = initStats(campaign)
 
-    // Update Stats
     const updateStats = (obj: any) => {
       if (!isReassigned) {
         obj.initialAssigned += 1
@@ -108,14 +107,23 @@ export default async function SuperAdminDashboard({
     updateStats(siteStats[site])
     updateStats(campaignStats[campaign])
 
+    // 🎯 NEW: Populate Transparency Data
+    const qaTaskName = r.qa?.full_name || profileMap[r.qa_id] || 'Admin'
+    if (!qaTaskStats[qaTaskName]) {
+      qaTaskStats[qaTaskName] = { name: qaTaskName, pending: 0, submitted: 0, reviewed: 0 }
+    }
+    if (r.status === 'ASSIGNED') qaTaskStats[qaTaskName].pending += 1
+    if (r.status === 'UNDER_QA_REVIEW') qaTaskStats[qaTaskName].submitted += 1
+    if (r.status === 'PUBLISHED') qaTaskStats[qaTaskName].reviewed += 1
+
     return r
   }) || []
   
   const qaReportArray = Object.values(qaStats)
   const siteReportArray = Object.values(siteStats)
   const campaignReportArray = Object.values(campaignStats)
+  const qaTaskReportArray = Object.values(qaTaskStats) // 🎯 NEW
 
-  // Reusable Table Component for the 3 categories
   const PerformanceTable = ({ title, data, colorClass, bgClass }: { title: string, data: any[], colorClass: string, bgClass: string }) => (
     <div className={`bg-white rounded-2xl shadow-sm border border-${colorClass}-200 overflow-hidden`}>
       <div className={`p-5 border-b border-${colorClass}-100 ${bgClass} flex justify-between items-center`}>
@@ -186,7 +194,6 @@ export default async function SuperAdminDashboard({
           <Link href="/super-admin/impact-report" className="flex items-center gap-2 bg-gradient-to-r from-shikho-indigo-600 to-shikho-magenta-500 text-white px-5 py-3 rounded-xl font-bold hover:shadow-lg shadow-sm text-sm font-poppins">📸 View Visual Impact Report</Link>
         </div>
 
-        {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100"><p className="text-sm text-gray-500 font-bold">Total Assigned</p><p className="text-3xl font-black text-gray-900">{total}</p></div>
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100"><p className="text-sm text-gray-500 font-bold">Agent Submitted</p><p className="text-3xl font-black text-blue-600">{agentCompleted}</p></div>
@@ -195,6 +202,40 @@ export default async function SuperAdminDashboard({
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-red-200 bg-red-50/50"><p className="text-sm text-red-700 font-bold">Total Failed</p><p className="text-3xl font-black text-red-600">{totalFailed}</p></div>
         </div>
 
+        {/* 🎯 NEW: QA Task Pipeline (Transparency Report) */}
+        {qaTaskReportArray.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-sm border border-teal-200 overflow-hidden">
+            <div className="p-5 border-b border-teal-100 bg-teal-50 flex justify-between items-center">
+              <div>
+                <h2 className="text-lg font-bold text-teal-900 font-poppins">QA Task Pipeline (Transparency)</h2>
+                <p className="text-xs text-teal-700 mt-1">Real-time status of tasks under each QA</p>
+              </div>
+            </div>
+            <div className="overflow-x-auto max-h-[300px]">
+              <table className="w-full text-left border-collapse">
+                <thead className="bg-white text-gray-500 text-[10px] uppercase font-bold sticky top-0 shadow-sm z-10">
+                  <tr>
+                    <th className="px-4 py-3 border-b">QA Name</th>
+                    <th className="px-4 py-3 text-center border-b border-l text-red-500 bg-red-50/50">Pending (Not Submitted)</th>
+                    <th className="px-4 py-3 text-center border-b border-l text-orange-500 bg-orange-50/50">Submitted (Need Review)</th>
+                    <th className="px-4 py-3 text-center border-b border-l text-emerald-600 bg-emerald-50/50">Reviewed (Done)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {qaTaskReportArray.map((row: any, idx: number) => (
+                    <tr key={idx} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-xs font-bold text-gray-900">{row.name}</td>
+                      <td className="px-4 py-3 text-xs font-bold text-center border-l text-red-600 bg-red-50/30">{row.pending}</td>
+                      <td className="px-4 py-3 text-xs font-bold text-center border-l text-orange-600 bg-orange-50/30">{row.submitted}</td>
+                      <td className="px-4 py-3 text-xs font-bold text-center border-l text-emerald-600 bg-emerald-50/30">{row.reviewed}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {/* 👑 Separate Performance Tables */}
         <div className="grid grid-cols-1 gap-8">
           {qaReportArray.length > 0 && <PerformanceTable title="QA Performance Summary" data={qaReportArray} colorClass="indigo" bgClass="bg-indigo-50" />}
@@ -202,7 +243,6 @@ export default async function SuperAdminDashboard({
           {campaignReportArray.length > 0 && <PerformanceTable title="Campaign Performance Summary" data={campaignReportArray} colorClass="purple" bgClass="bg-purple-50" />}
         </div>
 
-        {/* Tracking Table */}
         <TrackingTable reports={enrichedReports} profileMap={profileMap} userRole={profile?.role} userId={user.id} allQuizzes={allQuizzes || []} />
 
       </div>
