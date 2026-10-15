@@ -6,7 +6,6 @@ import { deleteEvaluationAttempt, sendIndividualReminder, sendBulkReminder, reas
 export default function TrackingTable({ reports, profileMap, userRole, userId, allQuizzes }: { reports: any[], profileMap: any, userRole: string, userId: string, allQuizzes?: any[] }) {
   const [search, setSearch] = useState({ date: '', title: '', campaign: '', qa: '', agent: '', status: '', result: '' })
   
-  // Modal States
   const [reassignModal, setReassignModal] = useState({ show: false, attempt_id: '', agent_id: '', qa_id: '', eval_id: '', campaign: '' })
   const [reassignMode, setReassignMode] = useState('auto')
 
@@ -19,8 +18,10 @@ export default function TrackingTable({ reports, profileMap, userRole, userId, a
     
     const statusStr = row.status === 'ASSIGNED' ? 'pending' : 'submitted'
     let resultStr = 'pending'
+    
+    // 🛠️ FIXED 70% Logic with Math.round()
     if (row.overall_score !== null) {
-      resultStr = row.overall_score >= row.evaluations.passing_score ? 'pass' : 'fail'
+      resultStr = Math.round(row.overall_score) >= (row.evaluations?.passing_score || 70) ? 'pass' : 'fail'
     }
 
     return dateStr.includes(search.date.toLowerCase()) &&
@@ -35,7 +36,6 @@ export default function TrackingTable({ reports, profileMap, userRole, userId, a
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mt-8">
       
-      {/* 🆕 REASSIGN MODAL (POP-UP) */}
       {reassignModal.show && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
           <div className="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-md">
@@ -88,8 +88,6 @@ export default function TrackingTable({ reports, profileMap, userRole, userId, a
         </div>
       )}
       
-      {/* ------------------ Standard Table Content Below ------------------ */}
-
       <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-lg font-semibold text-gray-900 font-poppins">Assignment & Review Tracking</h2>
@@ -129,8 +127,9 @@ export default function TrackingTable({ reports, profileMap, userRole, userId, a
           </thead>
           <tbody className="divide-y divide-gray-100">
             {filteredReports.map((row: any) => {
-              const score = row.overall_score !== null ? Math.min(100, row.overall_score) : null
-              const isPass = score !== null && score >= row.evaluations.passing_score
+              // 🛠️ FIXED 70% Logic with Math.round()
+              const score = row.overall_score !== null ? Math.round(Math.min(100, row.overall_score)) : null
+              const isPass = score !== null && score >= (row.evaluations?.passing_score || 70)
               const campaign = row.evaluations?.campaign || 'General'
 
               return (
@@ -148,7 +147,6 @@ export default function TrackingTable({ reports, profileMap, userRole, userId, a
                   
                   <td className="px-4 py-4 text-right flex justify-end gap-1.5 items-center flex-wrap">
                     
-                    {/* 🔄 Reassign Button (Opens Modal) */}
                     {score !== null && !isPass && (
                       <button 
                         type="button" 
@@ -159,21 +157,18 @@ export default function TrackingTable({ reports, profileMap, userRole, userId, a
                       </button>
                     )}
 
-                    {/* 🔔 Remind Button */}
                     {row.status === 'ASSIGNED' && (
                       <form action={async () => { await sendIndividualReminder(row.agent_id, row.evaluations?.title) }}>
                         <button type="submit" className="text-[10px] font-bold text-orange-600 bg-orange-50 px-2.5 py-1.5 rounded hover:bg-orange-100 transition-colors uppercase">Remind</button>
                       </form>
                     )}
                     
-                    {/* 👁️ View Button Fix (No 404 for Pending) */}
                     {row.status === 'ASSIGNED' ? (
                       <button onClick={() => alert('Agent has not submitted the exam yet. You can view the result after submission.')} className="text-[10px] font-bold text-gray-400 bg-gray-50 px-2.5 py-1.5 rounded uppercase border border-gray-200 cursor-not-allowed">View</button>
                     ) : (
                       <Link href={row.status === 'UNDER_QA_REVIEW' ? `/qa/review/${row.attempt_id}` : `/agent/result/${row.attempt_id}`} className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2.5 py-1.5 rounded hover:bg-blue-100 transition-colors uppercase border border-blue-100">View</Link>
                     )}
 
-                    {/* 🗑️ Delete Button */}
                     <form action={deleteEvaluationAttempt}>
                       <input type="hidden" name="attempt_id" value={row.attempt_id} />
                       <button type="submit" className="text-[10px] font-bold text-red-600 bg-red-50 px-2.5 py-1.5 rounded hover:bg-red-100 transition-colors uppercase">Delete</button>
